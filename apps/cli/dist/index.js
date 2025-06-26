@@ -5,7 +5,7 @@ import { Command } from "commander";
 import { intro, outro, isCancel, cancel, log as log2 } from "@clack/prompts";
 
 // package.json
-var version = "1.0.7";
+var version = "1.1.0";
 
 // src/lib/prompts.ts
 import { confirm, select, multiselect, text, spinner, log } from "@clack/prompts";
