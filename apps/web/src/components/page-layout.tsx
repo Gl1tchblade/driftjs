@@ -8,9 +8,9 @@ interface PageLayoutProps {
 
 export default function PageLayout({ children }: PageLayoutProps) {
   return (
-    <div className="min-h-screen bg-background">
+    <div className="flex min-h-screen flex-col bg-background">
       <MinimalNavigation />
-      {children}
+      <main className="flex-grow">{children}</main>
       <MinimalFooter />
     </div>
   )

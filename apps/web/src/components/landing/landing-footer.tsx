@@ -231,7 +231,7 @@ export function LandingFooter() {
 								<span className="font-bold text-lg">DriftJS Flow</span>
 							</div>
 							<div className="text-muted-foreground text-sm">
-								© 2024 DriftJS. All rights reserved.
+								© {new Date().getFullYear()} DriftJS. All rights reserved.
 							</div>
 						</div>
 
