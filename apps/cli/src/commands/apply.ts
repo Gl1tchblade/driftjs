@@ -10,7 +10,7 @@ import path from 'node:path'
 import pc from 'picocolors'
 import { Client as PgClient } from 'pg'
 import mysql from 'mysql2/promise'
-import sqlite3 from 'sqlite3'
+import Database from 'better-sqlite3'
 
 export interface ApplyOptions {
   migration?: string
@@ -166,7 +166,7 @@ async function connectToDatabase(envCfg: any): Promise<DatabaseConnection> {
     case 'sqlite':
       console.log('connecting to sqlite'); // DEBUG LOG
       const sqlitePath = connectionString.substring('sqlite:'.length);
-      const sqliteDb = new sqlite3.Database(sqlitePath || './database.db')
+      const sqliteDb = new Database(sqlitePath || './database.db')
       console.log('connected to sqlite'); // DEBUG LOG
       return { type: 'sqlite', client: sqliteDb }
       
@@ -291,27 +291,19 @@ async function recordMigrationApplied(connection: DatabaseConnection, migration:
 }
 
 async function executeQuery(connection: DatabaseConnection, query: string, params?: any[]): Promise<any[]> {
-  return new Promise((resolve, reject) => {
-    switch (connection.type) {
-      case 'postgresql':
-        connection.client.query(query, params, (err: any, result: any) => {
-          if (err) return reject(err)
-          resolve(result.rows)
-        })
-        break
-      case 'mysql':
-        connection.client.query(query, params)
-          .then(([rows]: any) => resolve(rows))
-          .catch((err: any) => reject(err))
-        break
-      case 'sqlite':
-        connection.client.all(query, params, (err: any, rows: any) => {
-          if (err) return reject(err)
-          resolve(rows)
-        })
-        break
-    }
-  })
+  switch (connection.type) {
+    case 'postgresql':
+      const pgResult = await connection.client.query(query, params)
+      return pgResult.rows
+      
+    case 'mysql':
+      const [mysqlResult] = await connection.client.execute(query, params)
+      return mysqlResult as any[]
+      
+    case 'sqlite':
+      const stmt = connection.client.prepare(query)
+      return stmt.all(params)
+  }
 }
 
 async function closeDatabaseConnection(connection: DatabaseConnection): Promise<void> {
@@ -329,19 +321,16 @@ async function closeDatabaseConnection(connection: DatabaseConnection): Promise<
 }
 
 function extractSQLFromMigrationFile(content: string): string {
-  // Basic extraction - look for SQL in strings, template literals, etc.
-  const sqlPatterns = [
-    /queryRunner\.query\s*\(\s*[`"']([^`"']+)[`"']/g,
-    /sql\s*`([^`]+)`/g,
-    /"((?:CREATE|ALTER|DROP|INSERT|UPDATE|DELETE)[^"]+)"/gi
-  ]
+  // Simple extraction logic, can be improved
+  // For now, assume SQL is in a template literal tagged with `sql`
+  const match = content.match(/sql`([\s\S]*)`/)
   
-  let extractedSQL = ''
+  const extractedSQL = match ? match[1].trim() : ''
   
-  for (const pattern of sqlPatterns) {
-    let match
-    while ((match = pattern.exec(content)) !== null) {
-      extractedSQL += match[1] + ';\n'
+  if (!extractedSQL) {
+    // Fallback for plain SQL files or different export format
+    if (content.includes('CREATE') || content.includes('ALTER') || content.includes('INSERT') || content.includes('UPDATE') || content.includes('DELETE')) {
+      return content;
     }
   }
   

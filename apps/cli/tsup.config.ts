@@ -12,6 +12,10 @@ export default defineConfig({
   banner: {
     js: '#!/usr/bin/env node',
   },
+  noExternal: [
+    '@driftjs/core',
+    '@driftjs/enhancer',
+  ],
   external: [
     'pg-native',
     'better-sqlite3',

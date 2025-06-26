@@ -11,7 +11,6 @@ import pc from 'picocolors'
 import { Client as PgClient } from 'pg'
 import mysql from 'mysql2/promise'
 import Database from 'better-sqlite3'
-import sqlite3 from 'sqlite3'
 
 export interface BackOptions {
   steps?: number
@@ -175,7 +174,7 @@ export async function backCommand(options: BackOptions, globalOptions: GlobalOpt
 
 async function connectToDatabase(envCfg: any): Promise<DatabaseConnection> {
   const connectionString = envCfg.db_connection_string || envCfg.databaseUrl;
-
+  
   if (!connectionString) {
     throw new Error('Database connection string not found in flow.config.json. Please provide "db_connection_string" or "databaseUrl".')
   }
@@ -187,16 +186,16 @@ async function connectToDatabase(envCfg: any): Promise<DatabaseConnection> {
       const pgClient = new PgClient({ connectionString })
       await pgClient.connect()
       return { type: 'postgresql', client: pgClient }
-
+      
     case 'mysql':
       const mysqlConnection = await mysql.createConnection(connectionString)
       return { type: 'mysql', client: mysqlConnection }
-
+      
     case 'sqlite':
       const sqlitePath = connectionString.substring('sqlite:'.length);
-      const sqliteDb = new sqlite3.Database(sqlitePath || './database.db')
+      const sqliteDb = new Database(sqlitePath || './database.db')
       return { type: 'sqlite', client: sqliteDb }
-
+      
     default:
       throw new Error(`Unsupported database type: ${dbType}`)
   }
@@ -256,32 +255,9 @@ async function findDownMigration(migration: AppliedMigration, envCfg: any, proje
   const files = await fs.readdir(absoluteMigrationsDir)
   
   for (const filename of files) {
-    const filePath = path.join(absoluteMigrationsDir, filename)
-    const stat = await fs.stat(filePath);
-    if (stat.isDirectory()) {
-      continue;
-    }
-    
-    if (await fs.pathExists(filePath)) {
-      let content = await fs.readFile(filePath, 'utf-8')
-      
-      // Extract SQL from TypeScript/JavaScript files if needed
-      if (filename.endsWith('.ts') || filename.endsWith('.js')) {
-        content = extractDownSQLFromMigrationFile(content)
-      }
-      
-      // For .sql files, look for -- DOWN section
-      if (filename.endsWith('.sql') && content.includes('-- DOWN')) {
-        const downSection = content.split('-- DOWN')[1]
-        if (downSection) {
-          return downSection.trim()
-        }
-      }
-      
-      // If it's a dedicated down file, return the whole content
-      if (filename.includes('down') || filename.includes('_down')) {
-        return content
-      }
+    if (path.parse(filename).name === migration.name) {
+      const content = await fs.readFile(path.join(absoluteMigrationsDir, filename), 'utf-8')
+      return extractDownSQLFromMigrationFile(content)
     }
   }
   
@@ -289,16 +265,9 @@ async function findDownMigration(migration: AppliedMigration, envCfg: any, proje
 }
 
 async function executeMigrationRollback(connection: DatabaseConnection, downContent: string): Promise<void> {
-  // Split migration content by semicolon and execute each statement
-  const statements = downContent
-    .split(';')
-    .map(stmt => stmt.trim())
-    .filter(stmt => stmt.length > 0)
-  
+  const statements = downContent.split(';').filter(s => s.trim() !== '')
   for (const statement of statements) {
-    if (statement.trim()) {
-      await executeQuery(connection, statement)
-    }
+    await executeQuery(connection, statement)
   }
 }
 
@@ -322,28 +291,17 @@ async function executeQuery(connection: DatabaseConnection, query: string, param
     case 'postgresql':
       const pgResult = await connection.client.query(query, params)
       return pgResult.rows
-      
     case 'mysql':
       const [mysqlResult] = await connection.client.execute(query, params)
-      return Array.isArray(mysqlResult) ? mysqlResult : [mysqlResult]
-      
+      return mysqlResult as any[]
     case 'sqlite':
-      return new Promise((resolve, reject) => {
-        const callback = (err: Error | null, rows: any[]) => {
-          if (err) {
-            reject(err)
-          } else {
-            resolve(rows)
-          }
-        }
-        if (query.toLowerCase().trim().startsWith('select')) {
-          connection.client.all(query, params, callback)
-        } else {
-          connection.client.run(query, params, callback)
-          resolve([]);
-        }
-      })
-      
+      const stmt = connection.client.prepare(query)
+      if (query.toLowerCase().trim().startsWith('select')) {
+        return stmt.all(params)
+      } else {
+        stmt.run(params)
+        return []
+      }
     default:
       throw new Error(`Unsupported database type: ${connection.type}`)
   }
@@ -354,9 +312,11 @@ async function closeDatabaseConnection(connection: DatabaseConnection): Promise<
     case 'postgresql':
       await connection.client.end()
       break
+      
     case 'mysql':
       await connection.client.end()
       break
+      
     case 'sqlite':
       connection.client.close()
       break

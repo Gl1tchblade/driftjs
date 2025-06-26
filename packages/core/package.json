@@ -11,6 +11,11 @@
     "check-types": "tsc --noEmit",
     "test": "jest"
   },
+  "author": "DriftJS Team",
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
   "dependencies": {},
   "devDependencies": {
     "tsup": "^8.0.0",

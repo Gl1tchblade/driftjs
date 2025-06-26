@@ -7,7 +7,7 @@ import { BaseORMDetector } from './base-detector.js'
 import { DrizzleConfig } from '@driftjs/core'
 import { DatabaseConfig, DetectionResult } from '@driftjs/core'
 import path from 'path'
-import fs from 'fs/promises'
+import fs from 'fs-extra'
 
 export class DrizzleDetector extends BaseORMDetector {
   name = 'drizzle'
@@ -95,14 +95,20 @@ export class DrizzleDetector extends BaseORMDetector {
       const driver = this.extractConfigValue(configContent, 'dialect') || 'pg'
       const validDrivers = ['pg', 'mysql2', 'better-sqlite3', 'sqlite'] as const
       const mappedDriver = validDrivers.includes(driver as any) ? driver as typeof validDrivers[number] : 'pg'
+      const outDir = this.extractConfigValue(configContent, 'out') || './drizzle'
+      const migrationDirAbsolute = path.resolve(projectPath, outDir)
       
       const config: DrizzleConfig = {
         type: 'drizzle',
         configFile,
         driver: mappedDriver,
         schemaPath: this.extractConfigValue(configContent, 'schema') || './src/db/schema.ts',
-        outDir: this.extractConfigValue(configContent, 'out') || './drizzle',
-        migrationDirectory: configFile, // Will be updated with proper migration directory
+        outDir: outDir,
+        migrationDirectory: {
+          absolute: migrationDirAbsolute,
+          relative: outDir,
+          exists: await fs.pathExists(migrationDirAbsolute)
+        },
         dependencies: ['drizzle-orm', 'drizzle-kit']
       }
       
