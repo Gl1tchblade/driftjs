@@ -1,0 +1,20 @@
+{
+  "version": "0.1.0",
+  "defaultEnvironment": "development",
+  "environments": {
+    "development": {
+      "db_connection_string": "sqlite:sqlite.db",
+      "migrations_folder": "./migrations"
+    }
+  },
+  "safety": {
+    "maxTableSizeMB": 1024,
+    "maxLockTimeMs": 300000
+  },
+  "database": {
+    "default": {
+      "type": "postgresql"
+    }
+  },
+  "orm": "drizzle"
+}

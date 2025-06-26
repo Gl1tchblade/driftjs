@@ -1,0 +1,36 @@
+{
+  "name": "@driftjs/analyzer",
+  "version": "0.1.0",
+  "description": "ORM detection and database analysis for DriftJS",
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "check-types": "tsc --noEmit",
+    "test": "jest"
+  },
+  "dependencies": {
+    "@driftjs/core": "workspace:*",
+    "fs-extra": "^11.2.0",
+    "pg": "^8.11.0",
+    "mysql2": "^3.9.0",
+    "better-sqlite3": "^9.4.0"
+  },
+  "devDependencies": {
+    "@types/fs-extra": "^11.0.4",
+    "@types/pg": "^8.11.0",
+    "@types/better-sqlite3": "^7.6.9",
+    "tsup": "^8.0.0",
+    "typescript": "^5.3.0",
+    "jest": "^29.7.0",
+    "@types/jest": "^29.5.0",
+    "ts-jest": "^29.1.0"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  }
+} 
