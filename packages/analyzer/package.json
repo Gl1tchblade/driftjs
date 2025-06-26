@@ -1,6 +1,6 @@
 {
   "name": "@driftjs/analyzer",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "ORM detection and database analysis for DriftJS",
   "main": "dist/index.js",
   "type": "module",
@@ -32,5 +32,10 @@
   ],
   "engines": {
     "node": ">=18.0.0"
+  },
+  "author": "DriftJS Team",
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
   }
 } 

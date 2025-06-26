@@ -256,7 +256,8 @@ var PrismaDetector = class extends BaseORMDetector {
 };
 
 // src/orm-detectors/drizzle-detector.ts
-import fs from "fs/promises";
+import path from "path";
+import fs from "fs-extra";
 var DrizzleDetector = class extends BaseORMDetector {
   name = "drizzle";
   async detect(projectPath) {
@@ -323,14 +324,19 @@ var DrizzleDetector = class extends BaseORMDetector {
       const driver = this.extractConfigValue(configContent, "dialect") || "pg";
       const validDrivers = ["pg", "mysql2", "better-sqlite3", "sqlite"];
       const mappedDriver = validDrivers.includes(driver) ? driver : "pg";
+      const outDir = this.extractConfigValue(configContent, "out") || "./drizzle";
+      const migrationDirAbsolute = path.resolve(projectPath, outDir);
       const config = {
         type: "drizzle",
         configFile,
         driver: mappedDriver,
         schemaPath: this.extractConfigValue(configContent, "schema") || "./src/db/schema.ts",
-        outDir: this.extractConfigValue(configContent, "out") || "./drizzle",
-        migrationDirectory: configFile,
-        // Will be updated with proper migration directory
+        outDir,
+        migrationDirectory: {
+          absolute: migrationDirAbsolute,
+          relative: outDir,
+          exists: await fs.pathExists(migrationDirAbsolute)
+        },
         dependencies: ["drizzle-orm", "drizzle-kit"]
       };
       return config;

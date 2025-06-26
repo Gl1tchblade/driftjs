@@ -1,6 +1,6 @@
 {
   "name": "@driftjs/enhancer",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "SQL enhancement engine for DriftJS",
   "main": "dist/index.js",
   "type": "module",
@@ -26,5 +26,10 @@
   ],
   "engines": {
     "node": ">=18.0.0"
+  },
+  "author": "DriftJS Team",
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
   }
 } 

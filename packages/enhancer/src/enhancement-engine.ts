@@ -3,25 +3,35 @@ import { SQLRiskDetector } from './risk-detector.js'
 import { EnhancementStrategyGenerator } from './strategy-generator.js'
 
 /**
- * High-level engine that analyses risks and generates an enhanced migration plan.
- * NOTE: This is a minimal placeholder – detailed logic will be filled in Phase 2.
+ * Ultra-fast enhancement engine optimized for sub-second analysis
+ * Uses caching, parallel processing, and optimized algorithms
  */
 export class EnhancementEngine {
   private risk = new SQLRiskDetector()
   private generator = new EnhancementStrategyGenerator({} as any)
-
+  private enhancementCache = new Map<string, EnhancedMigration>()
+  
   /**
-   * Analyse a migration file and return an enhanced, production-safe version.
+   * Ultra-fast migration analysis with aggressive caching and optimization
    */
   public async enhance(migration: MigrationFile): Promise<EnhancedMigration> {
-    // Concatenate SQL for risk analysis (basic approach)
-    const sql = migration.up
-    const riskReport = await this.risk.analyzeSQL(sql)
+    // Ultra-fast cache check using content hash
+    const cacheKey = this.generateCacheKey(migration.up)
+    if (this.enhancementCache.has(cacheKey)) {
+      const cached = this.enhancementCache.get(cacheKey)!
+      return {
+        ...cached,
+        original: migration // Update original reference
+      }
+    }
 
-    // Generate enhancement steps based on risk assessment
-    const strategy = await this.generator.generateStrategy(migration.up)
+    // Parallel risk analysis and strategy generation for maximum speed
+    const [riskReport, strategy] = await Promise.all([
+      this.risk.analyzeSQL(migration.up),
+      this.generator.generateStrategy(migration.up)
+    ])
 
-    return {
+    const enhanced: EnhancedMigration = {
       original: migration,
       enhanced: {
         up: strategy.enhancedSteps.map(s => s.sql).join('\n'),
@@ -32,5 +42,31 @@ export class EnhancementEngine {
       },
       estimatedDuration: strategy.estimatedDuration,
     } as EnhancedMigration
+
+    // Cache for ultra-fast future lookups
+    this.enhancementCache.set(cacheKey, enhanced)
+    
+    return enhanced
+  }
+
+  /**
+   * Generate ultra-fast cache key using simple hash
+   */
+  private generateCacheKey(sql: string): string {
+    // Simple but fast hash for caching
+    let hash = 0
+    for (let i = 0; i < sql.length; i++) {
+      const char = sql.charCodeAt(i)
+      hash = ((hash << 5) - hash) + char
+      hash = hash & hash // Convert to 32-bit integer
+    }
+    return hash.toString(36)
+  }
+
+  /**
+   * Clear cache if needed
+   */
+  public clearCache(): void {
+    this.enhancementCache.clear()
   }
 } 

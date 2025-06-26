@@ -303,7 +303,8 @@ var PrismaDetector = class extends BaseORMDetector {
 };
 
 // src/orm-detectors/drizzle-detector.ts
-var import_promises = __toESM(require("fs/promises"), 1);
+var import_path2 = __toESM(require("path"), 1);
+var import_fs_extra = __toESM(require("fs-extra"), 1);
 var DrizzleDetector = class extends BaseORMDetector {
   name = "drizzle";
   async detect(projectPath) {
@@ -366,18 +367,23 @@ var DrizzleDetector = class extends BaseORMDetector {
         return null;
       }
       const configFile = configFilesFound[0];
-      const configContent = await import_promises.default.readFile(configFile.absolute, "utf-8");
+      const configContent = await import_fs_extra.default.readFile(configFile.absolute, "utf-8");
       const driver = this.extractConfigValue(configContent, "dialect") || "pg";
       const validDrivers = ["pg", "mysql2", "better-sqlite3", "sqlite"];
       const mappedDriver = validDrivers.includes(driver) ? driver : "pg";
+      const outDir = this.extractConfigValue(configContent, "out") || "./drizzle";
+      const migrationDirAbsolute = import_path2.default.resolve(projectPath, outDir);
       const config = {
         type: "drizzle",
         configFile,
         driver: mappedDriver,
         schemaPath: this.extractConfigValue(configContent, "schema") || "./src/db/schema.ts",
-        outDir: this.extractConfigValue(configContent, "out") || "./drizzle",
-        migrationDirectory: configFile,
-        // Will be updated with proper migration directory
+        outDir,
+        migrationDirectory: {
+          absolute: migrationDirAbsolute,
+          relative: outDir,
+          exists: await import_fs_extra.default.pathExists(migrationDirAbsolute)
+        },
         dependencies: ["drizzle-orm", "drizzle-kit"]
       };
       return config;
@@ -391,7 +397,7 @@ var DrizzleDetector = class extends BaseORMDetector {
       const envFiles = [".env", ".env.local", ".env.development"];
       const { existing: envFilesFound } = await this.checkFiles(projectPath, envFiles);
       for (const envFile of envFilesFound) {
-        const envContent = await import_promises.default.readFile(envFile.absolute, "utf-8");
+        const envContent = await import_fs_extra.default.readFile(envFile.absolute, "utf-8");
         const dbUrl = this.extractEnvValue(envContent, "DATABASE_URL");
         if (dbUrl) {
           const parsed = this.parseDatabaseUrl(dbUrl);
@@ -430,7 +436,7 @@ var DrizzleDetector = class extends BaseORMDetector {
 };
 
 // src/orm-detectors/typeorm-detector.ts
-var import_promises2 = __toESM(require("fs/promises"), 1);
+var import_promises = __toESM(require("fs/promises"), 1);
 var TypeORMDetector = class extends BaseORMDetector {
   name = "typeorm";
   async detect(projectPath) {
@@ -511,12 +517,12 @@ var TypeORMDetector = class extends BaseORMDetector {
       let entities = [];
       let migrations = [];
       if (configFile.relative.endsWith(".json")) {
-        const configContent = await import_promises2.default.readFile(configFile.absolute, "utf-8");
+        const configContent = await import_promises.default.readFile(configFile.absolute, "utf-8");
         const jsonConfig = JSON.parse(configContent);
         entities = Array.isArray(jsonConfig.entities) ? jsonConfig.entities : ["src/**/*.entity.{ts,js}"];
         migrations = Array.isArray(jsonConfig.migrations) ? jsonConfig.migrations : ["src/migrations/*.{ts,js}"];
       } else {
-        const configContent = await import_promises2.default.readFile(configFile.absolute, "utf-8");
+        const configContent = await import_promises.default.readFile(configFile.absolute, "utf-8");
         entities = this.extractArrayValue(configContent, "entities") || ["src/**/*.entity.{ts,js}"];
         migrations = this.extractArrayValue(configContent, "migrations") || ["src/migrations/*.{ts,js}"];
       }
@@ -544,7 +550,7 @@ var TypeORMDetector = class extends BaseORMDetector {
       const envFiles = [".env", ".env.local", ".env.development"];
       const { existing: envFilesFound } = await this.checkFiles(projectPath, envFiles);
       for (const envFile of envFilesFound) {
-        const envContent = await import_promises2.default.readFile(envFile.absolute, "utf-8");
+        const envContent = await import_promises.default.readFile(envFile.absolute, "utf-8");
         const dbUrl = this.extractEnvValue(envContent, "DATABASE_URL") || this.extractEnvValue(envContent, "DB_URL") || this.extractEnvValue(envContent, "TYPEORM_URL");
         if (dbUrl) {
           const parsed = this.parseDatabaseUrl(dbUrl);
@@ -553,7 +559,7 @@ var TypeORMDetector = class extends BaseORMDetector {
       }
       const typeormConfig = await this.extractConfig(projectPath);
       if (typeormConfig?.configFile) {
-        const configContent = await import_promises2.default.readFile(typeormConfig.configFile.absolute, "utf-8");
+        const configContent = await import_promises.default.readFile(typeormConfig.configFile.absolute, "utf-8");
         const type = this.extractConfigValue(configContent, "type");
         const host = this.extractConfigValue(configContent, "host");
         const port = this.extractConfigValue(configContent, "port");
