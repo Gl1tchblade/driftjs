@@ -2,7 +2,7 @@
  * flow init - Initialize flow configuration
  */
 
-import { createSpinner, textInput, confirmAction } from '../lib/prompts.js'
+import { createFlowSpinner, textInput, confirmAction } from '../lib/prompts.js'
 import { GlobalOptions } from '../lib/config.js'
 import fsExtra from 'fs-extra'
 import { resolve } from 'node:path'
@@ -81,7 +81,7 @@ async function detectMigrationsDir(projectPath: string): Promise<string | null> 
 
 export async function initCommand(options: InitOptions, globalOptions: GlobalOptions): Promise<void> {
   const projectPath = resolve(options.project || process.cwd())
-  const spinner = createSpinner('Collecting project information')
+  const spinner = createFlowSpinner().start('Collecting project information')
 
   let envName: string, databaseUrl: string, migrationsPath: string;
 

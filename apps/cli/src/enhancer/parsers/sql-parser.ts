@@ -1,6 +1,6 @@
 import pkg from 'node-sql-parser';
 const { Parser } = pkg;
-import type { AST, Parser as ParserType } from 'node-sql-parser';
+import type { AST } from 'node-sql-parser';
 
 /**
  * SQL operation types that can be parsed and analyzed
@@ -54,7 +54,7 @@ export interface SqlParseResult {
  * SQL Parser class for analyzing migration SQL statements
  */
 export class SqlParser {
-  private parser: ParserType;
+  private parser: any;
 
   constructor() {
     // Initialize node-sql-parser with multiple database support

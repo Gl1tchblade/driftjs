@@ -99,7 +99,11 @@ export class DrizzleDetector extends BaseORMDetector {
       
       const config: DrizzleConfig = {
         type: 'drizzle',
-        configFile,
+        configFile: {
+          absolute: configFile.absolute,
+          relative: configFile.relative,
+          exists: await fs.pathExists(configFile.absolute)
+        },
         driver: mappedDriver,
         schemaPath: this.extractConfigValue(configContent, 'schema') || './src/db/schema.ts',
         outDir: outDir,

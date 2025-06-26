@@ -142,16 +142,101 @@ export async function confirmHighRiskOperation(
 }
 
 /**
- * Progress spinner with custom styling
+ * Enhanced progress spinner with custom styling and animations
  */
 export function createSpinner(message: string) {
   const s = spinner()
-  s.start(colors.blue(`🌊 ${message}`))
   
   return {
-    update: (newMessage: string) => s.message(colors.blue(`🌊 ${newMessage}`)),
-    succeed: (message?: string) => s.stop(colors.green(`✅ ${message || 'Complete'}`)),
-    fail: (message?: string) => s.stop(colors.red(`❌ ${message || 'Failed'}`)),
-    stop: () => s.stop()
+    start: (msg?: string) => {
+      s.start(colors.blue(`🌊 ${msg || message}`))
+      return {
+        update: (newMessage: string) => s.message(colors.blue(`🌊 ${newMessage}`)),
+        succeed: (successMessage?: string) => s.stop(colors.green(`✅ ${successMessage || 'Complete'}`)),
+        fail: (errorMessage?: string) => s.stop(colors.red(`❌ ${errorMessage || 'Failed'}`)),
+        stop: (finalMessage?: string) => s.stop(finalMessage ? colors.gray(finalMessage) : ''),
+        message: (msg: string) => s.message(colors.blue(`🌊 ${msg}`))
+      }
+    }
+  }
+}
+
+/**
+ * Create a simple spinner with fluent API
+ */
+export function createFlowSpinner() {
+  const s = spinner()
+  let isStarted = false
+  
+  return {
+    start: (message: string) => {
+      if (!isStarted) {
+        s.start(colors.blue(`🌊 ${message}`))
+        isStarted = true
+      }
+      return {
+        update: (msg: string) => s.message(colors.blue(`🌊 ${msg}`)),
+        succeed: (msg?: string) => {
+          s.stop(colors.green(`✅ ${msg || 'Complete'}`))
+          isStarted = false
+        },
+        fail: (msg?: string) => {
+          s.stop(colors.red(`❌ ${msg || 'Failed'}`))
+          isStarted = false
+        },
+        stop: (msg?: string) => {
+          s.stop(msg ? colors.gray(msg) : '')
+          isStarted = false
+        }
+      }
+    }
+  }
+}
+
+/**
+ * Display a success message with enhanced styling
+ */
+export function displaySuccess(message: string, details?: string[]): void {
+  log.success(colors.green(`✅ ${message}`))
+  if (details && details.length > 0) {
+    details.forEach(detail => {
+      log.info(colors.dim(`   • ${detail}`))
+    })
+  }
+}
+
+/**
+ * Display an error message with enhanced styling
+ */
+export function displayError(message: string, details?: string[]): void {
+  log.error(colors.red(`❌ ${message}`))
+  if (details && details.length > 0) {
+    details.forEach(detail => {
+      log.info(colors.dim(`   • ${detail}`))
+    })
+  }
+}
+
+/**
+ * Display a warning message with enhanced styling
+ */
+export function displayWarning(message: string, details?: string[]): void {
+  log.warn(colors.yellow(`⚠️  ${message}`))
+  if (details && details.length > 0) {
+    details.forEach(detail => {
+      log.info(colors.dim(`   • ${detail}`))
+    })
+  }
+}
+
+/**
+ * Display an info message with enhanced styling
+ */
+export function displayInfo(message: string, details?: string[]): void {
+  log.info(colors.blue(`ℹ️  ${message}`))
+  if (details && details.length > 0) {
+    details.forEach(detail => {
+      log.info(colors.dim(`   • ${detail}`))
+    })
   }
 } 

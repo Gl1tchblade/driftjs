@@ -1,107 +1,219 @@
 /**
- * @driftjs/flow - Enhanced database migration CLI tool
- * Core entry point with beautiful CLI interactions
+ * Flow CLI - Database Migration Enhancement Tool
+ * Automatically enhance database migrations with safety and performance improvements
  */
 
-import { Command } from 'commander'
-import { intro, outro, isCancel, cancel, log } from '@clack/prompts'
-import { version } from '../package.json'
-import { initCommand } from './commands/init.js'
-import { syncCommand } from './commands/sync.js'
-import { testCommand } from './commands/test.js'
-import { applyCommand } from './commands/apply.js'
-import { backCommand } from './commands/back.js'
+import { program } from 'commander';
+import { intro, outro, log } from '@clack/prompts';
+import pc from 'picocolors';
+import gradient from 'gradient-string';
+import boxen from 'boxen';
 
-const handleCommand = async (commandPromise: Promise<any>) => {
-  try {
-    await commandPromise;
-  } catch (error) {
-    if (isCancel(error)) {
-      cancel('Operation cancelled.');
-      process.exit(0);
+// Import commands with lazy loading for better performance
+const lazyImport = (importFn: () => Promise<any>) => {
+  let cachedModule: any = null;
+  return async () => {
+    if (!cachedModule) {
+      cachedModule = await importFn();
     }
-    log.error(error instanceof Error ? error.message : 'An unknown error occurred.');
-    process.exit(1);
-  }
+    return cachedModule;
+  };
 };
 
-const program = new Command()
+const getEnhanceCommand = lazyImport(() => import('./commands/enhance.js'));
+const getValidateCommand = lazyImport(() => import('./commands/validate.js'));
+const getPlanCommand = lazyImport(() => import('./commands/plan.js'));
+const getRollbackCommand = lazyImport(() => import('./commands/rollback.js'));
+const getInitCommand = lazyImport(() => import('./commands/init.js'));
+const getConfigCommand = lazyImport(() => import('./commands/config.js'));
+const getStatusCommand = lazyImport(() => import('./commands/status.js'));
 
+// Global options interface
+export interface GlobalOptions {
+  verbose?: boolean;
+  config?: string;
+  dry?: boolean;
+}
+
+// Performance: Cache the banner to avoid recomputing
+let cachedBanner: string | null = null;
+
+function getBanner(): string {
+  if (cachedBanner) return cachedBanner;
+  
+  const flowTitle = gradient('#00D4FF', '#0099CC', '#006699')('Flow');
+  const subtitle = pc.dim('Database Migration Enhancement Tool');
+  
+  cachedBanner = boxen(
+    `${flowTitle}\n${subtitle}`,
+    {
+      padding: { top: 1, bottom: 1, left: 2, right: 2 },
+      margin: { top: 1, bottom: 1 },
+      borderStyle: 'round',
+      borderColor: 'cyan',
+      backgroundColor: '#001122',
+      align: 'center'
+    }
+  );
+  
+  return cachedBanner!; // Non-null assertion since we just assigned it
+}
+
+function showBanner(): void {
+  console.log(getBanner());
+}
+
+// Enhanced error handling with better UX
+function handleError(error: any): void {
+  console.error(pc.red('\n❌ Error:'), error.message || error);
+  if (program.opts().verbose && error.stack) {
+    console.error(pc.dim('\nStack trace:'));
+    console.error(pc.dim(error.stack));
+  }
+  process.exit(1);
+}
+
+// Set up global error handlers
+process.on('uncaughtException', handleError);
+process.on('unhandledRejection', handleError);
+
+// Configure the CLI program
 program
   .name('flow')
-  .description('Enhanced database migration CLI tool for production-safety')
-  .version(version, '-v, --version', 'Output the current version')
-  .option('-d, --debug', 'Enable verbose logging')
-  .option('-c, --config <path>', 'Path to flow.config.json', './flow.config.json')
-  .option('--dry-run', 'Show what would be done without executing')
+  .description('🌊 Flow - Database Migration Enhancement Tool')
+  .version('1.2.0')
+  .option('-v, --verbose', 'Enable verbose output for debugging')
+  .option('-c, --config <path>', 'Path to configuration file')
+  .option('--dry', 'Run in dry-run mode (preview changes without applying)')
+  .hook('preAction', () => {
+    // Only show banner for the main commands, not help
+    const command = process.argv[2];
+    if (command && !['--help', '-h', '--version', '-V'].includes(command)) {
+      showBanner();
+    }
+  });
 
-// flow init - Initialize flow configuration
+// Main action commands - these operate on migration files
+program
+  .command('enhance')
+  .description('🚀 Interactively enhance a migration file with safety and performance improvements')
+  .argument('[file]', 'Migration file to enhance (auto-detects latest if not specified)')
+  .option('-p, --project <path>', 'Path to project directory')
+  .action(async (file: string | undefined, options: any) => {
+    try {
+      intro(pc.cyan('Starting Flow Enhancement Process'));
+      const { enhanceCommand } = await getEnhanceCommand();
+      await enhanceCommand({ file, project: options.project }, program.opts());
+      outro(pc.green('Enhancement completed! 🎉'));
+    } catch (error) {
+      handleError(error);
+    }
+  });
+
+program
+  .command('validate')
+  .description('🔍 Validate a migration file for potential issues')
+  .argument('[file]', 'Migration file to validate (auto-detects latest if not specified)')
+  .option('-p, --project <path>', 'Path to project directory')
+  .action(async (file: string | undefined, options: any) => {
+    try {
+      intro(pc.cyan('Starting Migration Validation'));
+      const { validateCommand } = await getValidateCommand();
+      await validateCommand({ file, project: options.project }, program.opts());
+      outro(pc.green('Validation completed! ✅'));
+    } catch (error) {
+      handleError(error);
+    }
+  });
+
+program
+  .command('plan')
+  .description('📋 Plan enhancement changes for a migration file')
+  .argument('[file]', 'Migration file to plan (auto-detects latest if not specified)')
+  .option('-p, --project <path>', 'Path to project directory')
+  .action(async (file: string | undefined, options: any) => {
+    try {
+      intro(pc.cyan('Creating Enhancement Plan'));
+      const { planCommand } = await getPlanCommand();
+      await planCommand({ file, project: options.project }, program.opts());
+      outro(pc.green('Plan created! 📋'));
+    } catch (error) {
+      handleError(error);
+    }
+  });
+
+program
+  .command('rollback')
+  .description('↩️  Rollback changes to a migration file')
+  .argument('[file]', 'Migration file to rollback (auto-detects latest if not specified)')
+  .option('-p, --project <path>', 'Path to project directory')
+  .action(async (file: string | undefined, options: any) => {
+    try {
+      intro(pc.cyan('Starting Rollback Process'));
+      const { rollbackCommand } = await getRollbackCommand();
+      await rollbackCommand({ file, project: options.project }, program.opts());
+      outro(pc.green('Rollback completed! ↩️'));
+    } catch (error) {
+      handleError(error);
+    }
+  });
+
+// Management commands - these manage the Flow tool itself
 program
   .command('init')
-  .description('Initialize flow configuration in current project')
-  .option('--project <path>', 'Path to the project directory')
-  .option('--env-name <name>', 'Name for the initial environment', 'development')
-  .option('--db-url <url>', 'Database connection string')
-  .option('--migrations-path <path>', 'Path to the migrations folder')
-  .option('-y, --yes', 'Skip interactive prompts and use default or provided values')
-  .action(async (options) => {
-    intro('🌊 DriftJS Flow - Initialize')
-    await handleCommand(initCommand(options, program.opts() as any));
-    outro('✅ Flow configuration initialized successfully!')
-  })
-
-// flow sync
-program
-  .command('sync')
-  .description('Detect ORM changes and create enhanced migration plan')
-  .option('--force', 'Force re-analysis of existing migrations')
-  .option('--orm <name>', 'Specify ORM (prisma, drizzle, typeorm, auto)', 'auto')
-  .option('--project <path>', 'Path to the project directory')
-  .option('-y, --yes', 'Skip interactive prompts and use default or provided values')
-  .action(async (options) => {
-    intro('🌊 DriftJS Flow - Sync')
-    await handleCommand(syncCommand(options, program.opts() as any));
-    outro('✅ Sync completed')
-  })
-
-// flow apply
-program
-  .command('apply')
-  .description('Apply pending migrations to the database')
-  .option('--migration <name>', 'Apply a specific migration by name')
-  .option('--target <name>', 'Apply migrations up to and including the target migration')
-  .option('--project <path>', 'Path to the project directory')
-  .option('-y, --yes', 'Skip interactive prompts and use default or provided values')
-  .action(async (options) => {
-    intro('🌊 DriftJS Flow - Apply')
-    await handleCommand(applyCommand(options, program.opts() as any));
-    outro('✅ Apply completed')
-  })
-
-// flow back
-program
-  .command('back')
-  .description('Rollback the latest migration batch')
-  .option('--steps <n>', 'Number of migrations to rollback', '1')
-  .option('--to <name>', 'Rollback to a specific migration (exclusive)')
-  .option('--project <path>', 'Path to the project directory')
-  .option('-y, --yes', 'Skip interactive prompts and use default or provided values')
-  .action(async (options) => {
-    intro('🌊 DriftJS Flow - Rollback')
-    // Convert steps to number
-    if (options.steps) {
-      options.steps = parseInt(options.steps, 10)
+  .description('🚀 Initialize Flow in your project')
+  .option('-p, --project <path>', 'Path to project directory')
+  .action(async (options: any) => {
+    try {
+      intro(pc.cyan('Initializing Flow'));
+      const { initCommand } = await getInitCommand();
+      await initCommand({ project: options.project }, program.opts());
+      outro(pc.green('Flow initialized successfully! 🚀'));
+    } catch (error) {
+      handleError(error);
     }
-    await handleCommand(backCommand(options, program.opts() as any));
-    outro('✅ Rollback completed')
-  })
+  });
 
-// flow test (internal)
 program
-  .command('test')
-  .description('Run internal diagnostics')
-  .option('--project <path>', 'Path to the project directory')
-  .action(testCommand as any)
+  .command('config')
+  .description('⚙️  Configure Flow settings')
+  .option('-p, --project <path>', 'Path to project directory')
+  .option('-s, --show', 'Show current configuration')
+  .option('-e, --edit', 'Edit configuration interactively')
+  .action(async (options: any) => {
+    try {
+      intro(pc.cyan('Managing Flow Configuration'));
+      const { configCommand } = await getConfigCommand();
+      await configCommand(options, program.opts());
+      outro(pc.green('Configuration updated! ⚙️'));
+    } catch (error) {
+      handleError(error);
+    }
+  });
 
-// Execute the CLI
-program.parse() 
+program
+  .command('status')
+  .description('📊 Show Flow status and statistics')
+  .option('-p, --project <path>', 'Path to project directory')
+  .action(async (options: any) => {
+    try {
+      intro(pc.cyan('Getting Flow Status'));
+      const { statusCommand } = await getStatusCommand();
+      await statusCommand({ project: options.project }, program.opts());
+      outro(pc.green('Status retrieved! 📊'));
+    } catch (error) {
+      handleError(error);
+    }
+  });
+
+// Show enhanced help if no arguments provided
+if (process.argv.length === 2) {
+  showBanner();
+  console.log(pc.dim('\n💡 Tip: Run'), pc.cyan('flow --help'), pc.dim('to see available commands'));
+  console.log(pc.dim('   Start with:'), pc.cyan('flow init'), pc.dim('to initialize Flow in your project'));
+  console.log(pc.dim('   Then use:'), pc.cyan('flow enhance'), pc.dim('to enhance your latest migration'));
+  console.log('');
+}
+
+// Parse command line arguments
+program.parse(); 

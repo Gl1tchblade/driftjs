@@ -1,11 +1,48 @@
 #!/usr/bin/env node
+var __defProp = Object.defineProperty;
+var __getOwnPropNames = Object.getOwnPropertyNames;
+var __require = /* @__PURE__ */ ((x) => typeof require !== "undefined" ? require : typeof Proxy !== "undefined" ? new Proxy(x, {
+  get: (a, b) => (typeof require !== "undefined" ? require : a)[b]
+}) : x)(function(x) {
+  if (typeof require !== "undefined") return require.apply(this, arguments);
+  throw Error('Dynamic require of "' + x + '" is not supported');
+});
+var __esm = (fn, res) => function __init() {
+  return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
+};
+var __export = (target, all) => {
+  for (var name in all)
+    __defProp(target, name, { get: all[name], enumerable: true });
+};
 
-// src/index.ts
-import { Command } from "commander";
-import { intro, outro, isCancel, cancel, log as log2 } from "@clack/prompts";
-
-// package.json
-var version = "1.1.1";
+// src/lib/config.ts
+import fsExtra from "fs-extra";
+import { resolve, dirname } from "path";
+async function getFlowConfig(global, projectPath) {
+  const configPath = await findConfigFile(projectPath || process.cwd(), global.config);
+  return JSON.parse(await fsExtra.readFile(configPath, "utf8"));
+}
+async function findConfigFile(startDir, explicit) {
+  if (explicit) {
+    const p = resolve(explicit);
+    if (await fsExtra.pathExists(p)) return p;
+    throw new Error(`Config file not found at ${p}`);
+  }
+  let dir = startDir;
+  while (true) {
+    const candidate = resolve(dir, "flow.config.json");
+    if (await fsExtra.pathExists(candidate)) return candidate;
+    const parent = dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  throw new Error("flow.config.json not found");
+}
+var init_config = __esm({
+  "src/lib/config.ts"() {
+    "use strict";
+  }
+});
 
 // src/lib/prompts.ts
 import { confirm, select, multiselect, text, spinner, log } from "@clack/prompts";
@@ -24,37 +61,2474 @@ async function textInput(message, options = {}) {
 }
 function createSpinner(message) {
   const s = spinner();
-  s.start(colors.blue(`\u{1F30A} ${message}`));
   return {
-    update: (newMessage) => s.message(colors.blue(`\u{1F30A} ${newMessage}`)),
-    succeed: (message2) => s.stop(colors.green(`\u2705 ${message2 || "Complete"}`)),
-    fail: (message2) => s.stop(colors.red(`\u274C ${message2 || "Failed"}`)),
-    stop: () => s.stop()
+    start: (msg) => {
+      s.start(colors.blue(`\u{1F30A} ${msg || message}`));
+      return {
+        update: (newMessage) => s.message(colors.blue(`\u{1F30A} ${newMessage}`)),
+        succeed: (successMessage) => s.stop(colors.green(`\u2705 ${successMessage || "Complete"}`)),
+        fail: (errorMessage) => s.stop(colors.red(`\u274C ${errorMessage || "Failed"}`)),
+        stop: (finalMessage) => s.stop(finalMessage ? colors.gray(finalMessage) : ""),
+        message: (msg2) => s.message(colors.blue(`\u{1F30A} ${msg2}`))
+      };
+    }
   };
 }
+function createFlowSpinner() {
+  const s = spinner();
+  let isStarted = false;
+  return {
+    start: (message) => {
+      if (!isStarted) {
+        s.start(colors.blue(`\u{1F30A} ${message}`));
+        isStarted = true;
+      }
+      return {
+        update: (msg) => s.message(colors.blue(`\u{1F30A} ${msg}`)),
+        succeed: (msg) => {
+          s.stop(colors.green(`\u2705 ${msg || "Complete"}`));
+          isStarted = false;
+        },
+        fail: (msg) => {
+          s.stop(colors.red(`\u274C ${msg || "Failed"}`));
+          isStarted = false;
+        },
+        stop: (msg) => {
+          s.stop(msg ? colors.gray(msg) : "");
+          isStarted = false;
+        }
+      };
+    }
+  };
+}
+function displaySuccess(message, details) {
+  log.success(colors.green(`\u2705 ${message}`));
+  if (details && details.length > 0) {
+    details.forEach((detail) => {
+      log.info(colors.dim(`   \u2022 ${detail}`));
+    });
+  }
+}
+function displayError(message, details) {
+  log.error(colors.red(`\u274C ${message}`));
+  if (details && details.length > 0) {
+    details.forEach((detail) => {
+      log.info(colors.dim(`   \u2022 ${detail}`));
+    });
+  }
+}
+function displayWarning(message, details) {
+  log.warn(colors.yellow(`\u26A0\uFE0F  ${message}`));
+  if (details && details.length > 0) {
+    details.forEach((detail) => {
+      log.info(colors.dim(`   \u2022 ${detail}`));
+    });
+  }
+}
+function displayInfo(message, details) {
+  log.info(colors.blue(`\u2139\uFE0F  ${message}`));
+  if (details && details.length > 0) {
+    details.forEach((detail) => {
+      log.info(colors.dim(`   \u2022 ${detail}`));
+    });
+  }
+}
+var init_prompts = __esm({
+  "src/lib/prompts.ts"() {
+    "use strict";
+  }
+});
 
-// src/commands/init.ts
-import fsExtra from "fs-extra";
-import { resolve as resolve2 } from "path";
-import dotenv from "dotenv";
+// src/enhancements/safety/transaction-wrapper.ts
+var enhancement, TransactionWrapperDetector, TransactionWrapperApplicator, transactionWrapperModule;
+var init_transaction_wrapper = __esm({
+  "src/enhancements/safety/transaction-wrapper.ts"() {
+    "use strict";
+    enhancement = {
+      id: "safety-transaction-wrapper",
+      name: "Transaction Wrapper",
+      description: "Wraps migration operations in database transactions to ensure atomicity and enable rollback on failure",
+      category: "safety",
+      priority: 9,
+      requiresConfirmation: false,
+      tags: ["transaction", "atomicity", "rollback", "critical"]
+    };
+    TransactionWrapperDetector = class {
+      async detect(migration) {
+        const content = migration.up.toLowerCase();
+        if (content.includes("begin") || content.includes("start transaction") || content.includes("commit")) {
+          return false;
+        }
+        const riskyOperations = [
+          "drop table",
+          "drop column",
+          "alter table",
+          "delete from",
+          "update ",
+          "create index",
+          "drop index"
+        ];
+        return riskyOperations.some((op) => content.includes(op));
+      }
+      async analyze(migration) {
+        const applicable = await this.detect(migration);
+        if (!applicable) {
+          return {
+            applicable: false,
+            confidence: 0,
+            issues: [],
+            impact: {
+              riskReduction: 0,
+              performanceImprovement: 0,
+              complexityAdded: 0,
+              description: "Transaction wrapper not applicable - migration already has transaction handling or no risky operations"
+            }
+          };
+        }
+        const issues = [];
+        const content = migration.up.toLowerCase();
+        if (content.includes("drop table")) {
+          issues.push({
+            severity: "high",
+            description: "DROP TABLE operation without transaction protection",
+            location: "DROP TABLE statement",
+            line: this.findLineNumber(migration.up, /drop\s+table/i),
+            recommendation: "Wrap in transaction to enable rollback if migration fails"
+          });
+        }
+        if (content.includes("alter table")) {
+          issues.push({
+            severity: "medium",
+            description: "ALTER TABLE operation without transaction protection",
+            location: "ALTER TABLE statement",
+            line: this.findLineNumber(migration.up, /alter\s+table/i),
+            recommendation: "Wrap in transaction to ensure consistency"
+          });
+        }
+        return {
+          applicable: true,
+          confidence: 0.9,
+          issues,
+          impact: {
+            riskReduction: 0.8,
+            performanceImprovement: 0,
+            complexityAdded: 0.1,
+            description: "Significantly reduces risk by enabling rollback on failure with minimal complexity added"
+          }
+        };
+      }
+      findLineNumber(content, pattern) {
+        const lines = content.split("\n");
+        for (let i = 0; i < lines.length; i++) {
+          if (pattern.test(lines[i])) {
+            return i + 1;
+          }
+        }
+        return 1;
+      }
+    };
+    TransactionWrapperApplicator = class {
+      async apply(content, migration) {
+        try {
+          const modifiedContent = `-- Flow Enhancement: Transaction Wrapper
+-- Wraps migration in transaction for safety and rollback capability
+BEGIN;
 
-// src/analyzer/orm-detectors/base-detector.ts
-import { join as join2 } from "path";
+${content.trim()}
+
+COMMIT;
+
+-- If any statement fails, the entire transaction will be rolled back automatically`;
+          return {
+            enhancement,
+            applied: true,
+            modifiedContent,
+            warnings: [],
+            changes: [
+              {
+                type: "WRAPPED",
+                original: content.trim(),
+                modified: modifiedContent,
+                line: 1,
+                reason: "Wrapped entire migration in transaction for safety"
+              }
+            ]
+          };
+        } catch (error) {
+          return {
+            enhancement,
+            applied: false,
+            modifiedContent: content,
+            warnings: [`Failed to apply transaction wrapper: ${error instanceof Error ? error.message : "Unknown error"}`],
+            changes: []
+          };
+        }
+      }
+    };
+    transactionWrapperModule = {
+      enhancement,
+      detector: new TransactionWrapperDetector(),
+      applicator: new TransactionWrapperApplicator()
+    };
+  }
+});
+
+// src/enhancements/safety/drop-table-safeguard.ts
+var enhancement2, DropTableSafeguardDetector, DropTableSafeguardApplicator, dropTableSafeguardModule;
+var init_drop_table_safeguard = __esm({
+  "src/enhancements/safety/drop-table-safeguard.ts"() {
+    "use strict";
+    enhancement2 = {
+      id: "safety-drop-table-safeguard",
+      name: "Drop Table Safeguard",
+      description: "Adds explicit confirmations and backup recommendations for DROP TABLE operations to prevent accidental data loss",
+      category: "safety",
+      priority: 10,
+      requiresConfirmation: true,
+      tags: ["drop-table", "data-protection", "backup", "critical"]
+    };
+    DropTableSafeguardDetector = class {
+      async detect(migration) {
+        const content = migration.up.toLowerCase();
+        return content.includes("drop table");
+      }
+      async analyze(migration) {
+        const applicable = await this.detect(migration);
+        if (!applicable) {
+          return {
+            applicable: false,
+            confidence: 0,
+            issues: [],
+            impact: {
+              riskReduction: 0,
+              performanceImprovement: 0,
+              complexityAdded: 0,
+              description: "No DROP TABLE operations found"
+            }
+          };
+        }
+        const issues = [];
+        const lines = migration.up.split("\n");
+        lines.forEach((line, index) => {
+          if (/drop\s+table/i.test(line)) {
+            const tableName = this.extractTableName(line);
+            issues.push({
+              severity: "critical",
+              description: `DROP TABLE operation on table "${tableName}" - IRREVERSIBLE DATA LOSS`,
+              location: line.trim(),
+              line: index + 1,
+              recommendation: "Ensure you have a backup and consider using a different approach if possible"
+            });
+          }
+        });
+        return {
+          applicable: true,
+          confidence: 1,
+          issues,
+          impact: {
+            riskReduction: 0.9,
+            performanceImprovement: 0,
+            complexityAdded: 0.2,
+            description: "Adds explicit warnings and safeguards to prevent accidental data loss from DROP TABLE operations"
+          }
+        };
+      }
+      extractTableName(line) {
+        const match = line.match(/drop\s+table\s+(?:if\s+exists\s+)?`?([^`\s;]+)`?/i);
+        return match ? match[1] : "unknown";
+      }
+    };
+    DropTableSafeguardApplicator = class {
+      async apply(content, migration) {
+        try {
+          const lines = content.split("\n");
+          const modifiedLines = [];
+          const changes = [];
+          for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            if (/drop\s+table/i.test(line)) {
+              const tableName = this.extractTableName(line);
+              const safeguardComment = `-- \u26A0\uFE0F  CRITICAL WARNING: DROP TABLE OPERATION
+-- Table: ${tableName}
+-- This operation will PERMANENTLY DELETE ALL DATA in this table
+-- Ensure you have a backup before proceeding
+-- Consider using 'DROP TABLE IF EXISTS' for safer execution
+-- Original command: ${line.trim()}`;
+              modifiedLines.push(safeguardComment);
+              const saferDropCommand = line.replace(/drop\s+table\s+/i, "DROP TABLE IF EXISTS ");
+              modifiedLines.push(saferDropCommand);
+              changes.push({
+                type: "MODIFIED",
+                original: line,
+                modified: safeguardComment + "\n" + saferDropCommand,
+                line: i + 1,
+                reason: "Added safety warnings and IF EXISTS clause to DROP TABLE operation"
+              });
+            } else {
+              modifiedLines.push(line);
+            }
+          }
+          return {
+            enhancement: enhancement2,
+            applied: true,
+            modifiedContent: modifiedLines.join("\n"),
+            warnings: [
+              "DROP TABLE operations detected - please verify you have backups",
+              "Added IF EXISTS clauses to prevent errors if tables don't exist"
+            ],
+            changes
+          };
+        } catch (error) {
+          return {
+            enhancement: enhancement2,
+            applied: false,
+            modifiedContent: content,
+            warnings: [`Failed to apply drop table safeguard: ${error instanceof Error ? error.message : "Unknown error"}`],
+            changes: []
+          };
+        }
+      }
+      extractTableName(line) {
+        const match = line.match(/drop\s+table\s+(?:if\s+exists\s+)?`?([^`\s;]+)`?/i);
+        return match ? match[1] : "unknown";
+      }
+    };
+    dropTableSafeguardModule = {
+      enhancement: enhancement2,
+      detector: new DropTableSafeguardDetector(),
+      applicator: new DropTableSafeguardApplicator()
+    };
+  }
+});
+
+// src/enhancements/safety/foreign-key-constraint.ts
+var enhancement3, ForeignKeyConstraintDetector, ForeignKeyConstraintApplicator, foreignKeyConstraintModule;
+var init_foreign_key_constraint = __esm({
+  "src/enhancements/safety/foreign-key-constraint.ts"() {
+    "use strict";
+    enhancement3 = {
+      id: "safety-foreign-key-constraint",
+      name: "Foreign Key Constraint Validation",
+      description: "Validates foreign key constraints and adds proper error handling",
+      category: "safety",
+      priority: 7,
+      requiresConfirmation: false,
+      tags: ["foreign-key", "constraint", "validation"]
+    };
+    ForeignKeyConstraintDetector = class {
+      async detect(migration) {
+        return migration.up.toLowerCase().includes("foreign key");
+      }
+      async analyze(migration) {
+        return {
+          applicable: await this.detect(migration),
+          confidence: 0.7,
+          issues: [],
+          impact: {
+            riskReduction: 0.5,
+            performanceImprovement: 0,
+            complexityAdded: 0.2,
+            description: "Validates foreign key constraints"
+          }
+        };
+      }
+    };
+    ForeignKeyConstraintApplicator = class {
+      async apply(content, migration) {
+        return {
+          enhancement: enhancement3,
+          applied: false,
+          modifiedContent: content,
+          warnings: ["Foreign key constraint enhancement not yet implemented"],
+          changes: []
+        };
+      }
+    };
+    foreignKeyConstraintModule = {
+      enhancement: enhancement3,
+      detector: new ForeignKeyConstraintDetector(),
+      applicator: new ForeignKeyConstraintApplicator()
+    };
+  }
+});
+
+// src/enhancements/safety/nullable-column.ts
+var enhancement4, NullableColumnDetector, NullableColumnApplicator, nullableColumnModule;
+var init_nullable_column = __esm({
+  "src/enhancements/safety/nullable-column.ts"() {
+    "use strict";
+    enhancement4 = {
+      id: "safety-nullable-column",
+      name: "Nullable Column Safety",
+      description: "Ensures safe handling of nullable column operations by adding proper NULL checks and default values",
+      category: "safety",
+      priority: 6,
+      requiresConfirmation: true,
+      tags: ["nullable", "column", "safety", "null-checks"]
+    };
+    NullableColumnDetector = class {
+      async detect(migration) {
+        const content = migration.up.toLowerCase();
+        return content.includes("alter column") && content.includes("null") || content.includes("not null") || content.includes("set null") || content.includes("drop not null");
+      }
+      async analyze(migration) {
+        const applicable = await this.detect(migration);
+        if (!applicable) {
+          return { applicable: false, confidence: 0, issues: [], impact: { riskReduction: 0, performanceImprovement: 0, complexityAdded: 0, description: "No nullable column operations detected" } };
+        }
+        const issues = [];
+        const content = migration.up.toLowerCase();
+        const lines = migration.up.split("\n");
+        if (content.includes("not null") && !content.includes("default")) {
+          issues.push({
+            severity: "high",
+            description: "Adding NOT NULL constraint without a default value can fail if table has existing NULL values",
+            location: "ALTER COLUMN ... NOT NULL",
+            line: lines.findIndex((line) => line.toLowerCase().includes("not null")) + 1,
+            recommendation: "Add a default value or update existing NULL values before applying constraint"
+          });
+        }
+        if (content.includes("drop not null")) {
+          issues.push({
+            severity: "medium",
+            description: "Removing NOT NULL constraint without data validation can lead to unexpected NULL values",
+            location: "DROP NOT NULL",
+            line: lines.findIndex((line) => line.toLowerCase().includes("drop not null")) + 1,
+            recommendation: "Consider if allowing NULL values is intentional and add application-level validation"
+          });
+        }
+        return {
+          applicable: true,
+          confidence: 0.8,
+          issues,
+          impact: {
+            riskReduction: 0.7,
+            performanceImprovement: 0,
+            complexityAdded: 0.3,
+            description: "Adds proper NULL handling and validation to column modifications"
+          }
+        };
+      }
+    };
+    NullableColumnApplicator = class {
+      async apply(content, migration) {
+        let modifiedContent = content;
+        const changes = [];
+        if (content.toLowerCase().includes("not null") && !content.toLowerCase().includes("default")) {
+          const lines = content.split("\n");
+          let modified = false;
+          for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            if (line.toLowerCase().includes("alter column") && line.toLowerCase().includes("not null")) {
+              const safetyComment = "  -- Safety check: Ensure no NULL values exist before adding NOT NULL constraint";
+              const updateComment = "  -- UPDATE table_name SET column_name = 'default_value' WHERE column_name IS NULL;";
+              lines.splice(i, 0, safetyComment);
+              lines.splice(i + 1, 0, updateComment);
+              changes.push({
+                type: "ADDED",
+                original: line,
+                modified: `${safetyComment}
+${updateComment}
+${line}`,
+                line: i + 1,
+                reason: "Added safety check comments for NOT NULL constraint"
+              });
+              i += 2;
+              modified = true;
+            }
+          }
+          if (modified) {
+            modifiedContent = lines.join("\n");
+          }
+        }
+        if (content.toLowerCase().includes("drop not null")) {
+          const lines = content.split("\n");
+          let modified = false;
+          for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            if (line.toLowerCase().includes("drop not null")) {
+              const intentionComment = "  -- Safety check: Consider if allowing NULL values is intentional";
+              const validationComment = "  -- Add application-level validation if needed";
+              lines.splice(i, 0, intentionComment);
+              lines.splice(i + 1, 0, validationComment);
+              changes.push({
+                type: "ADDED",
+                original: line,
+                modified: `${intentionComment}
+${validationComment}
+${line}`,
+                line: i + 1,
+                reason: "Added safety warnings for DROP NOT NULL constraint"
+              });
+              i += 2;
+              modified = true;
+            }
+          }
+          if (modified) {
+            modifiedContent = lines.join("\n");
+          }
+        }
+        return {
+          enhancement: enhancement4,
+          applied: changes.length > 0,
+          modifiedContent,
+          warnings: changes.length === 0 ? ["No nullable column safety improvements were applied"] : [],
+          changes
+        };
+      }
+    };
+    nullableColumnModule = {
+      enhancement: enhancement4,
+      detector: new NullableColumnDetector(),
+      applicator: new NullableColumnApplicator()
+    };
+  }
+});
+
+// src/enhancements/safety/index-creation.ts
+var enhancement5, StubDetector, StubApplicator, indexCreationModule;
+var init_index_creation = __esm({
+  "src/enhancements/safety/index-creation.ts"() {
+    "use strict";
+    enhancement5 = { id: "safety-index-creation", name: "Index Creation Safety", description: "Stub", category: "safety", priority: 5, requiresConfirmation: false, tags: ["stub"] };
+    StubDetector = class {
+      async detect(migration) {
+        return false;
+      }
+      async analyze(migration) {
+        return { applicable: false, confidence: 0, issues: [], impact: { riskReduction: 0, performanceImprovement: 0, complexityAdded: 0, description: "Stub" } };
+      }
+    };
+    StubApplicator = class {
+      async apply(content, migration) {
+        return { enhancement: enhancement5, applied: false, modifiedContent: content, warnings: ["Not implemented"], changes: [] };
+      }
+    };
+    indexCreationModule = { enhancement: enhancement5, detector: new StubDetector(), applicator: new StubApplicator() };
+  }
+});
+
+// src/enhancements/safety/data-type-change.ts
+var enhancement6, DataTypeChangeDetector, DataTypeChangeApplicator, dataTypeChangeModule;
+var init_data_type_change = __esm({
+  "src/enhancements/safety/data-type-change.ts"() {
+    "use strict";
+    enhancement6 = {
+      id: "safety-data-type-change",
+      name: "Data Type Change Safety",
+      description: "Detects risky data type conversions and suggests safer migration patterns",
+      category: "safety",
+      priority: 8,
+      requiresConfirmation: true,
+      tags: ["data-type", "conversion", "safety", "column-alteration"]
+    };
+    DataTypeChangeDetector = class {
+      async detect(migration) {
+        const content = migration.up.toLowerCase();
+        return content.includes("alter column") && content.includes("type") || content.includes("alter table") && content.includes("alter column") || content.includes("change column");
+      }
+      async analyze(migration) {
+        const applicable = await this.detect(migration);
+        if (!applicable) {
+          return {
+            applicable: false,
+            confidence: 0,
+            issues: [],
+            impact: { riskReduction: 0, performanceImprovement: 0, complexityAdded: 0, description: "No data type changes detected" }
+          };
+        }
+        const issues = [];
+        const content = migration.up.toLowerCase();
+        const lines = migration.up.split("\n");
+        const riskyConversions = [
+          { from: "varchar", to: "int", risk: "high" },
+          { from: "text", to: "varchar", risk: "medium" },
+          { from: "decimal", to: "int", risk: "high" },
+          { from: "timestamp", to: "date", risk: "medium" }
+        ];
+        for (const conversion of riskyConversions) {
+          if (content.includes(conversion.to)) {
+            issues.push({
+              severity: conversion.risk,
+              description: `Converting to ${conversion.to} may cause data loss or conversion errors`,
+              location: "ALTER COLUMN ... TYPE",
+              line: lines.findIndex((line) => line.toLowerCase().includes("type")) + 1 || 1,
+              recommendation: `Verify data compatibility before converting to ${conversion.to} type`
+            });
+          }
+        }
+        return {
+          applicable: true,
+          confidence: 0.8,
+          issues,
+          impact: {
+            riskReduction: 0.7,
+            performanceImprovement: 0,
+            complexityAdded: 0.4,
+            description: "Adds safety checks and warnings for risky data type conversions"
+          }
+        };
+      }
+    };
+    DataTypeChangeApplicator = class {
+      async apply(content, migration) {
+        let modifiedContent = content;
+        const changes = [];
+        if (content.toLowerCase().includes("alter column") && content.toLowerCase().includes("type")) {
+          const lines = content.split("\n");
+          let modified = false;
+          for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            if (line.toLowerCase().includes("alter column") && line.toLowerCase().includes("type")) {
+              lines.splice(i, 0, "  -- Safety check: Verify data compatibility before type conversion");
+              lines.splice(i + 1, 0, "  -- Consider backing up data or using a staged migration approach");
+              changes.push("Added data type conversion safety comments");
+              i += 2;
+              modified = true;
+            }
+          }
+          if (modified) {
+            modifiedContent = lines.join("\n");
+          }
+        }
+        return {
+          enhancement: enhancement6,
+          applied: changes.length > 0,
+          modifiedContent,
+          warnings: changes.length === 0 ? ["No data type change safety improvements were applied"] : [],
+          changes: changes.map((change) => ({
+            type: "ADDED",
+            original: "",
+            modified: change,
+            line: 1,
+            reason: change
+          }))
+        };
+      }
+    };
+    dataTypeChangeModule = {
+      enhancement: enhancement6,
+      detector: new DataTypeChangeDetector(),
+      applicator: new DataTypeChangeApplicator()
+    };
+  }
+});
+
+// src/enhancements/safety/column-renaming.ts
+var enhancement7, ColumnRenamingDetector, ColumnRenamingApplicator, columnRenamingModule;
+var init_column_renaming = __esm({
+  "src/enhancements/safety/column-renaming.ts"() {
+    "use strict";
+    enhancement7 = {
+      id: "safety-column-renaming",
+      name: "Column Renaming Safety",
+      description: "Warns about application compatibility risks when renaming database columns",
+      category: "safety",
+      priority: 7,
+      requiresConfirmation: true,
+      tags: ["column", "rename", "compatibility", "breaking-change"]
+    };
+    ColumnRenamingDetector = class {
+      async detect(migration) {
+        const content = migration.up.toLowerCase();
+        return content.includes("rename column") || content.includes("alter column") && content.includes("rename to");
+      }
+      async analyze(migration) {
+        const applicable = await this.detect(migration);
+        if (!applicable) {
+          return {
+            applicable: false,
+            confidence: 0,
+            issues: [],
+            impact: { riskReduction: 0, performanceImprovement: 0, complexityAdded: 0, description: "No column renaming detected" }
+          };
+        }
+        const issues = [];
+        const content = migration.up.toLowerCase();
+        const lines = migration.up.split("\n");
+        if (content.includes("rename column")) {
+          issues.push({
+            severity: "high",
+            description: "Renaming columns can break existing application code and queries",
+            location: "RENAME COLUMN operation",
+            line: lines.findIndex((line) => line.toLowerCase().includes("rename column")) + 1 || 1,
+            recommendation: "Consider a staged approach: add new column, copy data, update application, then drop old column"
+          });
+        }
+        return {
+          applicable: true,
+          confidence: 0.8,
+          issues,
+          impact: {
+            riskReduction: 0.7,
+            performanceImprovement: 0,
+            complexityAdded: 0.4,
+            description: "Prevents application breakage from column renames"
+          }
+        };
+      }
+    };
+    ColumnRenamingApplicator = class {
+      async apply(content, migration) {
+        let modifiedContent = content;
+        const changes = [];
+        const lines = content.split("\n");
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          if (line.toLowerCase().includes("rename column")) {
+            const warnings = [
+              "-- \u26A0\uFE0F  COLUMN RENAME WARNING:",
+              "-- This operation can break existing application code.",
+              "-- Recommended staged approach:",
+              "-- 1. Add new column with desired name",
+              "-- 2. Copy data from old to new column",
+              "-- 3. Update application code to use new column",
+              "-- 4. Drop old column in a separate migration"
+            ];
+            lines.splice(i, 0, ...warnings);
+            changes.push("Added column renaming safety warning");
+            i += warnings.length;
+          }
+        }
+        if (changes.length > 0) {
+          modifiedContent = lines.join("\n");
+        }
+        return {
+          enhancement: enhancement7,
+          applied: changes.length > 0,
+          modifiedContent,
+          warnings: changes.length === 0 ? ["No column renaming operations found"] : [],
+          changes: changes.map((change) => ({
+            type: "ADDED",
+            original: "RENAME COLUMN",
+            modified: change,
+            line: 1,
+            reason: change
+          }))
+        };
+      }
+    };
+    columnRenamingModule = {
+      enhancement: enhancement7,
+      detector: new ColumnRenamingDetector(),
+      applicator: new ColumnRenamingApplicator()
+    };
+  }
+});
+
+// src/enhancements/safety/cascade-delete.ts
+var enhancement8, CascadeDeleteDetector, CascadeDeleteApplicator, cascadeDeleteModule;
+var init_cascade_delete = __esm({
+  "src/enhancements/safety/cascade-delete.ts"() {
+    "use strict";
+    enhancement8 = {
+      id: "safety-cascade-delete",
+      name: "Cascade Delete Safety",
+      description: "Warns about CASCADE DELETE operations and suggests safer alternatives",
+      category: "safety",
+      priority: 9,
+      requiresConfirmation: true,
+      tags: ["cascade", "delete", "foreign-key", "safety"]
+    };
+    CascadeDeleteDetector = class {
+      async detect(migration) {
+        const content = migration.up.toLowerCase();
+        return content.includes("on delete cascade") || content.includes("cascade delete");
+      }
+      async analyze(migration) {
+        const applicable = await this.detect(migration);
+        if (!applicable) {
+          return {
+            applicable: false,
+            confidence: 0,
+            issues: [],
+            impact: { riskReduction: 0, performanceImprovement: 0, complexityAdded: 0, description: "No cascade delete operations detected" }
+          };
+        }
+        const issues = [];
+        const content = migration.up.toLowerCase();
+        const lines = migration.up.split("\n");
+        if (content.includes("on delete cascade")) {
+          issues.push({
+            severity: "high",
+            description: "CASCADE DELETE can cause unintended data loss across related tables",
+            location: "ON DELETE CASCADE constraint",
+            line: lines.findIndex((line) => line.toLowerCase().includes("on delete cascade")) + 1 || 1,
+            recommendation: "Consider using ON DELETE RESTRICT or SET NULL with application-level cleanup logic"
+          });
+        }
+        return {
+          applicable: true,
+          confidence: 0.9,
+          issues,
+          impact: {
+            riskReduction: 0.8,
+            performanceImprovement: 0,
+            complexityAdded: 0.3,
+            description: "Prevents accidental data loss from cascade deletions"
+          }
+        };
+      }
+    };
+    CascadeDeleteApplicator = class {
+      async apply(content, migration) {
+        let modifiedContent = content;
+        const changes = [];
+        const lines = content.split("\n");
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          if (line.toLowerCase().includes("on delete cascade")) {
+            const warnings = [
+              "-- \u26A0\uFE0F  CASCADE DELETE WARNING:",
+              "-- This will automatically delete related records in child tables.",
+              "-- Consider safer alternatives:",
+              "-- 1. ON DELETE RESTRICT (prevents deletion if child records exist)",
+              "-- 2. ON DELETE SET NULL (sets foreign key to NULL)",
+              "-- 3. Application-level cleanup logic"
+            ];
+            lines.splice(i, 0, ...warnings);
+            changes.push("Added CASCADE DELETE safety warning");
+            i += warnings.length;
+          }
+        }
+        if (changes.length > 0) {
+          modifiedContent = lines.join("\n");
+        }
+        return {
+          enhancement: enhancement8,
+          applied: changes.length > 0,
+          modifiedContent,
+          warnings: changes.length === 0 ? ["No cascade delete operations found"] : [],
+          changes: changes.map((change) => ({
+            type: "ADDED",
+            original: "ON DELETE CASCADE",
+            modified: change,
+            line: 1,
+            reason: change
+          }))
+        };
+      }
+    };
+    cascadeDeleteModule = {
+      enhancement: enhancement8,
+      detector: new CascadeDeleteDetector(),
+      applicator: new CascadeDeleteApplicator()
+    };
+  }
+});
+
+// src/enhancements/safety/unique-constraint.ts
+var enhancement9, UniqueConstraintDetector, UniqueConstraintApplicator, uniqueConstraintModule;
+var init_unique_constraint = __esm({
+  "src/enhancements/safety/unique-constraint.ts"() {
+    "use strict";
+    enhancement9 = {
+      id: "safety-unique-constraint",
+      name: "Unique Constraint Safety",
+      description: "Warns about potential issues when adding unique constraints to existing tables with data",
+      category: "safety",
+      priority: 7,
+      requiresConfirmation: true,
+      tags: ["unique", "constraint", "safety", "data-integrity"]
+    };
+    UniqueConstraintDetector = class {
+      async detect(migration) {
+        const content = migration.up.toLowerCase();
+        return content.includes("unique") && (content.includes("constraint") || content.includes("add unique") || content.includes("create unique"));
+      }
+      async analyze(migration) {
+        const applicable = await this.detect(migration);
+        if (!applicable) {
+          return {
+            applicable: false,
+            confidence: 0,
+            issues: [],
+            impact: { riskReduction: 0, performanceImprovement: 0, complexityAdded: 0, description: "No unique constraints detected" }
+          };
+        }
+        const issues = [];
+        const content = migration.up.toLowerCase();
+        const lines = migration.up.split("\n");
+        if (content.includes("add unique") || content.includes("add constraint") && content.includes("unique")) {
+          issues.push({
+            severity: "medium",
+            description: "Adding unique constraint to existing table may fail if duplicate values exist",
+            location: "UNIQUE constraint",
+            line: lines.findIndex((line) => line.toLowerCase().includes("unique")) + 1 || 1,
+            recommendation: "Verify data uniqueness before adding constraint or clean up duplicates first"
+          });
+        }
+        return {
+          applicable: true,
+          confidence: 0.8,
+          issues,
+          impact: {
+            riskReduction: 0.6,
+            performanceImprovement: 0,
+            complexityAdded: 0.3,
+            description: "Prevents constraint violation errors during migration"
+          }
+        };
+      }
+    };
+    UniqueConstraintApplicator = class {
+      async apply(content, migration) {
+        let modifiedContent = content;
+        const changes = [];
+        const lines = content.split("\n");
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          if (line.toLowerCase().includes("unique") && (line.toLowerCase().includes("constraint") || line.toLowerCase().includes("add unique"))) {
+            const warnings = [
+              "-- UNIQUE CONSTRAINT WARNING:",
+              "-- Ensure no duplicate values exist before adding unique constraint:",
+              "-- SELECT column_name, COUNT(*) FROM table_name GROUP BY column_name HAVING COUNT(*) > 1;"
+            ];
+            lines.splice(i, 0, ...warnings);
+            changes.push("Added unique constraint safety check");
+            i += warnings.length;
+          }
+        }
+        if (changes.length > 0) {
+          modifiedContent = lines.join("\n");
+        }
+        return {
+          enhancement: enhancement9,
+          applied: changes.length > 0,
+          modifiedContent,
+          warnings: changes.length === 0 ? ["No unique constraints found"] : [],
+          changes: changes.map((change) => ({
+            type: "ADDED",
+            original: "UNIQUE constraint",
+            modified: change,
+            line: 1,
+            reason: change
+          }))
+        };
+      }
+    };
+    uniqueConstraintModule = {
+      enhancement: enhancement9,
+      detector: new UniqueConstraintDetector(),
+      applicator: new UniqueConstraintApplicator()
+    };
+  }
+});
+
+// src/enhancements/safety/check-constraint.ts
+var enhancement10, CheckConstraintDetector, CheckConstraintApplicator, checkConstraintModule;
+var init_check_constraint = __esm({
+  "src/enhancements/safety/check-constraint.ts"() {
+    "use strict";
+    enhancement10 = {
+      id: "safety-check-constraint",
+      name: "Check Constraint Safety",
+      description: "Warns about potential issues when adding check constraints to existing tables",
+      category: "safety",
+      priority: 6,
+      requiresConfirmation: true,
+      tags: ["check", "constraint", "validation", "safety"]
+    };
+    CheckConstraintDetector = class {
+      async detect(migration) {
+        const content = migration.up.toLowerCase();
+        return content.includes("check") && content.includes("constraint");
+      }
+      async analyze(migration) {
+        const applicable = await this.detect(migration);
+        if (!applicable) {
+          return {
+            applicable: false,
+            confidence: 0,
+            issues: [],
+            impact: { riskReduction: 0, performanceImprovement: 0, complexityAdded: 0, description: "No check constraints detected" }
+          };
+        }
+        const issues = [];
+        const content = migration.up.toLowerCase();
+        const lines = migration.up.split("\n");
+        if (content.includes("add constraint") && content.includes("check")) {
+          issues.push({
+            severity: "medium",
+            description: "Adding check constraint to existing table may fail if data violates the constraint",
+            location: "CHECK constraint",
+            line: lines.findIndex((line) => line.toLowerCase().includes("check")) + 1 || 1,
+            recommendation: "Verify existing data meets constraint requirements before adding"
+          });
+        }
+        return {
+          applicable: true,
+          confidence: 0.8,
+          issues,
+          impact: {
+            riskReduction: 0.6,
+            performanceImprovement: 0,
+            complexityAdded: 0.3,
+            description: "Prevents constraint violation errors during migration"
+          }
+        };
+      }
+    };
+    CheckConstraintApplicator = class {
+      async apply(content, migration) {
+        let modifiedContent = content;
+        const changes = [];
+        const lines = content.split("\n");
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          if (line.toLowerCase().includes("check") && line.toLowerCase().includes("constraint")) {
+            const warnings = [
+              "-- CHECK CONSTRAINT WARNING:",
+              "-- Verify existing data meets constraint requirements:",
+              "-- SELECT * FROM table_name WHERE NOT (constraint_condition);"
+            ];
+            lines.splice(i, 0, ...warnings);
+            changes.push("Added check constraint validation warning");
+            i += warnings.length;
+          }
+        }
+        if (changes.length > 0) {
+          modifiedContent = lines.join("\n");
+        }
+        return {
+          enhancement: enhancement10,
+          applied: changes.length > 0,
+          modifiedContent,
+          warnings: changes.length === 0 ? ["No check constraints found"] : [],
+          changes: changes.map((change) => ({
+            type: "ADDED",
+            original: "CHECK constraint",
+            modified: change,
+            line: 1,
+            reason: change
+          }))
+        };
+      }
+    };
+    checkConstraintModule = {
+      enhancement: enhancement10,
+      detector: new CheckConstraintDetector(),
+      applicator: new CheckConstraintApplicator()
+    };
+  }
+});
+
+// src/enhancements/safety/backup-recommendation.ts
+var enhancement11, BackupRecommendationDetector, BackupRecommendationApplicator, backupRecommendationModule;
+var init_backup_recommendation = __esm({
+  "src/enhancements/safety/backup-recommendation.ts"() {
+    "use strict";
+    enhancement11 = {
+      id: "safety-backup-recommendation",
+      name: "Backup Recommendation",
+      description: "Recommends taking database backups before executing risky migration operations",
+      category: "safety",
+      priority: 9,
+      requiresConfirmation: false,
+      tags: ["backup", "safety", "data-protection", "risk-mitigation"]
+    };
+    BackupRecommendationDetector = class {
+      async detect(migration) {
+        const content = migration.up.toLowerCase();
+        const riskyOperations = [
+          "drop table",
+          "drop column",
+          "alter column",
+          "truncate",
+          "delete from",
+          "update",
+          "drop index",
+          "drop constraint"
+        ];
+        return riskyOperations.some((op) => content.includes(op));
+      }
+      async analyze(migration) {
+        const applicable = await this.detect(migration);
+        if (!applicable) {
+          return {
+            applicable: false,
+            confidence: 0,
+            issues: [],
+            impact: { riskReduction: 0, performanceImprovement: 0, complexityAdded: 0, description: "No risky operations detected" }
+          };
+        }
+        const issues = [];
+        const content = migration.up.toLowerCase();
+        const lines = migration.up.split("\n");
+        const riskyOperations = [
+          { operation: "drop table", severity: "critical", description: "Dropping tables permanently removes all data" },
+          { operation: "drop column", severity: "high", description: "Dropping columns permanently removes data" },
+          { operation: "truncate", severity: "critical", description: "Truncating tables removes all data" },
+          { operation: "delete from", severity: "high", description: "Mass deletion operations can remove critical data" }
+        ];
+        for (const op of riskyOperations) {
+          if (content.includes(op.operation)) {
+            issues.push({
+              severity: op.severity,
+              description: op.description,
+              location: op.operation.toUpperCase(),
+              line: lines.findIndex((line) => line.toLowerCase().includes(op.operation)) + 1 || 1,
+              recommendation: "Create a database backup before executing this migration"
+            });
+          }
+        }
+        return {
+          applicable: true,
+          confidence: 0.9,
+          issues,
+          impact: {
+            riskReduction: 0.9,
+            performanceImprovement: 0,
+            complexityAdded: 0.1,
+            description: "Adds backup recommendations for data safety"
+          }
+        };
+      }
+    };
+    BackupRecommendationApplicator = class {
+      async apply(content, migration) {
+        const changes = [];
+        const backupWarning = [
+          "-- \u26A0\uFE0F  IMPORTANT: BACKUP RECOMMENDATION",
+          "-- This migration contains potentially destructive operations.",
+          "-- It is STRONGLY recommended to create a full database backup before proceeding.",
+          "-- Command example: pg_dump database_name > backup_$(date +%Y%m%d_%H%M%S).sql",
+          "--"
+        ].join("\n");
+        const modifiedContent = backupWarning + "\n" + content;
+        changes.push("Added backup recommendation warning");
+        return {
+          enhancement: enhancement11,
+          applied: true,
+          modifiedContent,
+          warnings: [],
+          changes: changes.map((change) => ({
+            type: "ADDED",
+            original: "",
+            modified: change,
+            line: 1,
+            reason: change
+          }))
+        };
+      }
+    };
+    backupRecommendationModule = {
+      enhancement: enhancement11,
+      detector: new BackupRecommendationDetector(),
+      applicator: new BackupRecommendationApplicator()
+    };
+  }
+});
+
+// src/enhancements/safety/migration-order.ts
+var enhancement12, MigrationOrderDetector, MigrationOrderApplicator, migrationOrderModule;
+var init_migration_order = __esm({
+  "src/enhancements/safety/migration-order.ts"() {
+    "use strict";
+    enhancement12 = {
+      id: "safety-migration-order",
+      name: "Migration Order Safety",
+      description: "Checks for potential issues with the order of operations in migrations",
+      category: "safety",
+      priority: 8,
+      requiresConfirmation: false,
+      tags: ["order", "sequence", "dependencies", "safety"]
+    };
+    MigrationOrderDetector = class {
+      async detect(migration) {
+        const content = migration.up.toLowerCase();
+        return content.includes("drop") && content.includes("create") || content.includes("alter") && content.includes("add") || content.includes("insert") && content.includes("create");
+      }
+      async analyze(migration) {
+        const applicable = await this.detect(migration);
+        if (!applicable) {
+          return {
+            applicable: false,
+            confidence: 0,
+            issues: [],
+            impact: { riskReduction: 0, performanceImprovement: 0, complexityAdded: 0, description: "No order-sensitive operations detected" }
+          };
+        }
+        const issues = [];
+        const content = migration.up.toLowerCase();
+        const lines = migration.up.split("\n");
+        if (content.includes("insert") && content.includes("create table")) {
+          const insertIndex = lines.findIndex((line) => line.toLowerCase().includes("insert"));
+          const createIndex = lines.findIndex((line) => line.toLowerCase().includes("create table"));
+          if (insertIndex >= 0 && createIndex >= 0 && insertIndex < createIndex) {
+            issues.push({
+              severity: "high",
+              description: "INSERT statement appears before CREATE TABLE - this will cause an error",
+              location: "INSERT before CREATE TABLE",
+              line: insertIndex + 1,
+              recommendation: "Move CREATE TABLE statements before INSERT statements"
+            });
+          }
+        }
+        return {
+          applicable: true,
+          confidence: 0.7,
+          issues,
+          impact: {
+            riskReduction: 0.6,
+            performanceImprovement: 0,
+            complexityAdded: 0.2,
+            description: "Prevents migration failures due to incorrect operation ordering"
+          }
+        };
+      }
+    };
+    MigrationOrderApplicator = class {
+      async apply(content, migration) {
+        let modifiedContent = content;
+        const changes = [];
+        const orderingGuideline = [
+          "-- MIGRATION ORDER GUIDELINES:",
+          "-- 1. CREATE statements (tables, indexes) first",
+          "-- 2. ALTER statements (modify existing structures)",
+          "-- 3. INSERT/UPDATE statements (data operations)",
+          "-- 4. DROP statements (remove structures) last",
+          "--"
+        ].join("\n");
+        modifiedContent = orderingGuideline + "\n" + content;
+        changes.push("Added migration order guidelines");
+        return {
+          enhancement: enhancement12,
+          applied: true,
+          modifiedContent,
+          warnings: [],
+          changes: changes.map((change) => ({
+            type: "ADDED",
+            original: "",
+            modified: change,
+            line: 1,
+            reason: change
+          }))
+        };
+      }
+    };
+    migrationOrderModule = {
+      enhancement: enhancement12,
+      detector: new MigrationOrderDetector(),
+      applicator: new MigrationOrderApplicator()
+    };
+  }
+});
+
+// src/enhancements/safety/index.ts
+async function loadSafetyEnhancements() {
+  return [
+    transactionWrapperModule,
+    dropTableSafeguardModule,
+    foreignKeyConstraintModule,
+    nullableColumnModule,
+    indexCreationModule,
+    dataTypeChangeModule,
+    columnRenamingModule,
+    cascadeDeleteModule,
+    uniqueConstraintModule,
+    checkConstraintModule,
+    backupRecommendationModule,
+    migrationOrderModule
+  ];
+}
+var init_safety = __esm({
+  "src/enhancements/safety/index.ts"() {
+    "use strict";
+    init_transaction_wrapper();
+    init_drop_table_safeguard();
+    init_foreign_key_constraint();
+    init_nullable_column();
+    init_index_creation();
+    init_data_type_change();
+    init_column_renaming();
+    init_cascade_delete();
+    init_unique_constraint();
+    init_check_constraint();
+    init_backup_recommendation();
+    init_migration_order();
+  }
+});
+
+// src/enhancements/speed/concurrent-index.ts
+import pkg from "node-sql-parser";
+async function analyzeIndexEffectiveness(indexStmt, migration) {
+  const columns = extractIndexColumns(indexStmt);
+  const tableName = extractTableName(indexStmt);
+  if (columns.some((col) => col.includes("_id") || col.includes("Id"))) {
+    return {
+      shouldIndex: true,
+      reason: "Foreign key column detected",
+      recommendation: "Use CONCURRENT option to allow non-blocking index creation",
+      priority: "high"
+    };
+  }
+  const commonQueryColumns = ["email", "username", "status", "created_at", "updated_at"];
+  if (columns.some((col) => commonQueryColumns.includes(col.toLowerCase()))) {
+    return {
+      shouldIndex: true,
+      reason: "Common query column detected",
+      recommendation: "Use CONCURRENT option to allow non-blocking index creation",
+      priority: "medium"
+    };
+  }
+  if (indexStmt.unique || migration.up.toLowerCase().includes("unique index")) {
+    return {
+      shouldIndex: true,
+      reason: "Unique constraint index",
+      recommendation: "Use CONCURRENT option to allow non-blocking index creation",
+      priority: "high"
+    };
+  }
+  if (columns.length > 3) {
+    return {
+      shouldIndex: false,
+      reason: "Complex composite index may not be efficient",
+      recommendation: "Review if all columns are needed, consider separate indexes",
+      priority: "low"
+    };
+  }
+  if (columns.some((col) => col.toLowerCase().includes("text") || col.toLowerCase().includes("description"))) {
+    return {
+      shouldIndex: false,
+      reason: "Text/blob columns are not efficient for regular indexing",
+      recommendation: "Consider partial index or full-text search instead",
+      priority: "medium"
+    };
+  }
+  return {
+    shouldIndex: true,
+    reason: "Standard index",
+    recommendation: "Use CONCURRENT option to allow non-blocking index creation",
+    priority: "low"
+  };
+}
+function extractIndexColumns(indexStmt) {
+  if (!indexStmt.on) return [];
+  try {
+    if (Array.isArray(indexStmt.on)) {
+      return indexStmt.on.map((col) => col.column || col.name || String(col));
+    }
+    if (indexStmt.on.column) {
+      return [indexStmt.on.column];
+    }
+    return [];
+  } catch (error) {
+    return [];
+  }
+}
+function extractTableName(indexStmt) {
+  try {
+    return indexStmt.table?.table || indexStmt.table?.name || "unknown_table";
+  } catch (error) {
+    return "unknown_table";
+  }
+}
+var Parser, enhancement13, concurrentIndexDetector, concurrentIndexApplicator, concurrentIndexModule;
+var init_concurrent_index = __esm({
+  "src/enhancements/speed/concurrent-index.ts"() {
+    "use strict";
+    ({ Parser } = pkg);
+    enhancement13 = {
+      id: "speed-concurrent-index",
+      name: "Concurrent Index Creation",
+      description: "Modifies CREATE INDEX operations to use CONCURRENT option, allowing index creation without blocking reads/writes",
+      category: "speed",
+      priority: 8,
+      requiresConfirmation: false,
+      tags: ["index", "concurrent", "performance", "non-blocking"]
+    };
+    concurrentIndexDetector = {
+      async detect(migration) {
+        const parser = new Parser();
+        try {
+          const ast = parser.astify(migration.up, { database: "postgresql" });
+          const statements = Array.isArray(ast) ? ast : [ast];
+          return statements.some(
+            (stmt) => stmt.type === "create" && stmt.keyword === "index" && !migration.up.toLowerCase().includes("concurrently")
+            // Only if not already concurrent
+          );
+        } catch (error) {
+          return /create\s+index/i.test(migration.up) && !/create\s+index\s+concurrently/i.test(migration.up);
+        }
+      },
+      async analyze(migration) {
+        const parser = new Parser();
+        const issues = [];
+        try {
+          const ast = parser.astify(migration.up, { database: "postgresql" });
+          const statements = Array.isArray(ast) ? ast : [ast];
+          for (let i = 0; i < statements.length; i++) {
+            const stmt = statements[i];
+            if (stmt.type === "create" && stmt.keyword === "index") {
+              const indexName = stmt.index || "unnamed_index";
+              const analysis = await analyzeIndexEffectiveness(stmt, migration);
+              if (analysis.shouldIndex) {
+                const isConcurrent = migration.up.toLowerCase().includes("concurrently");
+                if (!isConcurrent) {
+                  issues.push({
+                    line: i + 1,
+                    description: `Index "${indexName}" creation will block table access during creation`,
+                    recommendation: analysis.recommendation,
+                    severity: analysis.priority === "high" ? "critical" : "medium",
+                    location: `CREATE INDEX ${indexName}`
+                  });
+                }
+              } else {
+                issues.push({
+                  line: i + 1,
+                  description: `Index "${indexName}" may not be beneficial: ${analysis.reason}`,
+                  recommendation: `Consider removing this index or reviewing if it's truly needed`,
+                  severity: "low",
+                  location: `CREATE INDEX ${indexName}`
+                });
+              }
+            }
+          }
+        } catch (error) {
+          const lines = migration.up.split("\n");
+          lines.forEach((line, index) => {
+            if (/create\s+index/i.test(line) && !/concurrently/i.test(line)) {
+              const indexMatch = line.match(/create\s+index\s+(\w+)/i);
+              const indexName = indexMatch?.[1] || "unknown";
+              issues.push({
+                line: index + 1,
+                description: `Index "${indexName}" creation will block table access during creation`,
+                recommendation: "Use CONCURRENT option to allow non-blocking index creation",
+                severity: "medium",
+                location: `CREATE INDEX ${indexName}`
+              });
+            }
+          });
+        }
+        return {
+          applicable: issues.length > 0,
+          confidence: issues.length > 0 ? 0.8 : 0,
+          issues,
+          impact: {
+            riskReduction: 0.3,
+            performanceImprovement: 0.7,
+            complexityAdded: 0.1,
+            description: "Analyzes CREATE INDEX operations for blocking behavior and effectiveness"
+          }
+        };
+      }
+    };
+    concurrentIndexApplicator = {
+      async apply(content, migration) {
+        const parser = new Parser();
+        let modifiedContent = content;
+        const changes = [];
+        try {
+          const ast = parser.astify(content, { database: "postgresql" });
+          const statements = Array.isArray(ast) ? ast : [ast];
+          let hasChanges = false;
+          for (const stmt of statements) {
+            if (stmt.type === "create" && stmt.keyword === "index") {
+              const analysis = await analyzeIndexEffectiveness(stmt, migration);
+              if (analysis.shouldIndex && !content.toLowerCase().includes("concurrently")) {
+                const originalLine = modifiedContent.match(/CREATE\s+INDEX\s+[^\n]*/gi)?.[0] || "";
+                modifiedContent = modifiedContent.replace(
+                  /CREATE\s+INDEX\s+/gi,
+                  "CREATE INDEX CONCURRENTLY "
+                );
+                hasChanges = true;
+                changes.push({
+                  type: "MODIFIED",
+                  original: originalLine,
+                  modified: originalLine.replace(/CREATE\s+INDEX\s+/gi, "CREATE INDEX CONCURRENTLY "),
+                  line: 1,
+                  reason: "Made index creation concurrent for better performance"
+                });
+              }
+            }
+          }
+          return {
+            enhancement: enhancement13,
+            applied: hasChanges,
+            modifiedContent,
+            changes,
+            warnings: []
+          };
+        } catch (error) {
+          const originalContent = modifiedContent;
+          const lines = modifiedContent.split("\n");
+          const modifiedLines = [];
+          lines.forEach((line, index) => {
+            if (/CREATE\s+INDEX\s+/gi.test(line) && !/CONCURRENTLY/i.test(line)) {
+              const modifiedLine = line.replace(/CREATE\s+INDEX\s+/gi, "CREATE INDEX CONCURRENTLY ");
+              modifiedLines.push(modifiedLine);
+              changes.push({
+                type: "MODIFIED",
+                original: line,
+                modified: modifiedLine,
+                line: index + 1,
+                reason: "Added CONCURRENTLY to index creation"
+              });
+            } else {
+              modifiedLines.push(line);
+            }
+          });
+          const hasChanges = changes.length > 0;
+          return {
+            enhancement: enhancement13,
+            applied: hasChanges,
+            modifiedContent: hasChanges ? modifiedLines.join("\n") : originalContent,
+            changes,
+            warnings: []
+          };
+        }
+      }
+    };
+    concurrentIndexModule = {
+      enhancement: enhancement13,
+      detector: concurrentIndexDetector,
+      applicator: concurrentIndexApplicator
+    };
+  }
+});
+
+// src/enhancements/speed/remaining-stubs.ts
+var StubDetector2, StubApplicator2, batchInsertEnhancement, batchInsertModule, partialIndexEnhancement, partialIndexModule, indexOptimizationEnhancement, indexOptimizationModule, concurrentIndexModule2, queryOptimizationEnhancement, queryOptimizationModule, bulkUpdateEnhancement, bulkUpdateModule, connectionPoolingEnhancement, connectionPoolingModule, vacuumAnalyzeEnhancement, vacuumAnalyzeModule, parallelExecutionEnhancement, parallelExecutionModule, compressionEnhancement, compressionModule, statisticsUpdateEnhancement, statisticsUpdateModule, cacheOptimizationEnhancement, cacheOptimizationModule;
+var init_remaining_stubs = __esm({
+  "src/enhancements/speed/remaining-stubs.ts"() {
+    "use strict";
+    init_concurrent_index();
+    StubDetector2 = class {
+      async detect() {
+        return false;
+      }
+      async analyze() {
+        return { applicable: false, confidence: 0, issues: [], impact: { riskReduction: 0, performanceImprovement: 0, complexityAdded: 0, description: "Stub" } };
+      }
+    };
+    StubApplicator2 = class {
+      async apply(content) {
+        return { enhancement: {}, applied: false, modifiedContent: content, warnings: ["Not implemented"], changes: [] };
+      }
+    };
+    batchInsertEnhancement = { id: "speed-batch-insert", name: "Batch Insert", description: "Stub", category: "speed", priority: 5, requiresConfirmation: false, tags: ["stub"] };
+    batchInsertModule = { enhancement: batchInsertEnhancement, detector: new StubDetector2(), applicator: new StubApplicator2() };
+    partialIndexEnhancement = { id: "speed-partial-index", name: "Partial Index", description: "Stub", category: "speed", priority: 5, requiresConfirmation: false, tags: ["stub"] };
+    partialIndexModule = { enhancement: partialIndexEnhancement, detector: new StubDetector2(), applicator: new StubApplicator2() };
+    indexOptimizationEnhancement = { id: "speed-index-optimization", name: "Index Optimization", description: "Stub", category: "speed", priority: 5, requiresConfirmation: false, tags: ["stub"] };
+    indexOptimizationModule = { enhancement: indexOptimizationEnhancement, detector: new StubDetector2(), applicator: new StubApplicator2() };
+    concurrentIndexModule2 = concurrentIndexModule;
+    queryOptimizationEnhancement = { id: "speed-query-optimization", name: "Query Optimization", description: "Stub", category: "speed", priority: 5, requiresConfirmation: false, tags: ["stub"] };
+    queryOptimizationModule = { enhancement: queryOptimizationEnhancement, detector: new StubDetector2(), applicator: new StubApplicator2() };
+    bulkUpdateEnhancement = { id: "speed-bulk-update", name: "Bulk Update", description: "Stub", category: "speed", priority: 5, requiresConfirmation: false, tags: ["stub"] };
+    bulkUpdateModule = { enhancement: bulkUpdateEnhancement, detector: new StubDetector2(), applicator: new StubApplicator2() };
+    connectionPoolingEnhancement = { id: "speed-connection-pooling", name: "Connection Pooling", description: "Stub", category: "speed", priority: 5, requiresConfirmation: false, tags: ["stub"] };
+    connectionPoolingModule = { enhancement: connectionPoolingEnhancement, detector: new StubDetector2(), applicator: new StubApplicator2() };
+    vacuumAnalyzeEnhancement = { id: "speed-vacuum-analyze", name: "Vacuum Analyze", description: "Stub", category: "speed", priority: 5, requiresConfirmation: false, tags: ["stub"] };
+    vacuumAnalyzeModule = { enhancement: vacuumAnalyzeEnhancement, detector: new StubDetector2(), applicator: new StubApplicator2() };
+    parallelExecutionEnhancement = { id: "speed-parallel-execution", name: "Parallel Execution", description: "Stub", category: "speed", priority: 5, requiresConfirmation: false, tags: ["stub"] };
+    parallelExecutionModule = { enhancement: parallelExecutionEnhancement, detector: new StubDetector2(), applicator: new StubApplicator2() };
+    compressionEnhancement = { id: "speed-compression", name: "Compression", description: "Stub", category: "speed", priority: 5, requiresConfirmation: false, tags: ["stub"] };
+    compressionModule = { enhancement: compressionEnhancement, detector: new StubDetector2(), applicator: new StubApplicator2() };
+    statisticsUpdateEnhancement = { id: "speed-statistics-update", name: "Statistics Update", description: "Stub", category: "speed", priority: 5, requiresConfirmation: false, tags: ["stub"] };
+    statisticsUpdateModule = { enhancement: statisticsUpdateEnhancement, detector: new StubDetector2(), applicator: new StubApplicator2() };
+    cacheOptimizationEnhancement = { id: "speed-cache-optimization", name: "Cache Optimization", description: "Stub", category: "speed", priority: 5, requiresConfirmation: false, tags: ["stub"] };
+    cacheOptimizationModule = { enhancement: cacheOptimizationEnhancement, detector: new StubDetector2(), applicator: new StubApplicator2() };
+  }
+});
+
+// src/enhancements/speed/index.ts
+async function loadSpeedEnhancements() {
+  return [
+    batchInsertModule,
+    concurrentIndexModule2,
+    partialIndexModule,
+    indexOptimizationModule,
+    queryOptimizationModule,
+    bulkUpdateModule,
+    connectionPoolingModule,
+    vacuumAnalyzeModule,
+    parallelExecutionModule,
+    compressionModule,
+    statisticsUpdateModule,
+    cacheOptimizationModule
+  ];
+}
+var init_speed = __esm({
+  "src/enhancements/speed/index.ts"() {
+    "use strict";
+    init_remaining_stubs();
+  }
+});
+
+// src/core/enhancement-engine.ts
+var EnhancementEngine;
+var init_enhancement_engine = __esm({
+  "src/core/enhancement-engine.ts"() {
+    "use strict";
+    init_safety();
+    init_speed();
+    EnhancementEngine = class {
+      safetyModules = [];
+      speedModules = [];
+      initialized = false;
+      // Performance optimizations
+      analysisCache = /* @__PURE__ */ new Map();
+      detectionCache = /* @__PURE__ */ new Map();
+      moduleCache = /* @__PURE__ */ new Map();
+      /**
+       * Initialize the enhancement engine by loading all enhancement modules
+       * Uses lazy loading for better performance
+       */
+      async initialize() {
+        if (this.initialized) return;
+        try {
+          const [safetyModulesPromise, speedModulesPromise] = await Promise.all([
+            loadSafetyEnhancements(),
+            loadSpeedEnhancements()
+          ]);
+          this.safetyModules = safetyModulesPromise;
+          this.speedModules = speedModulesPromise;
+          this.safetyModules.sort((a, b) => b.enhancement.priority - a.enhancement.priority);
+          this.speedModules.sort((a, b) => b.enhancement.priority - a.enhancement.priority);
+          [...this.safetyModules, ...this.speedModules].forEach((module) => {
+            this.moduleCache.set(module.enhancement.id, module);
+          });
+          this.initialized = true;
+        } catch (error) {
+          console.error("Failed to initialize enhancement engine:", error);
+          throw error;
+        }
+      }
+      /**
+       * Detect applicable safety enhancements for a migration
+       * @param migration Migration file to analyze
+       * @returns Array of applicable safety enhancements with analysis
+       */
+      async detectSafetyEnhancements(migration) {
+        await this.initialize();
+        const applicableEnhancements = [];
+        const cacheKey = `safety_${migration.name}_${migration.up.length}`;
+        if (this.detectionCache.has(cacheKey)) {
+          return this.getCachedEnhancements(cacheKey, this.safetyModules);
+        }
+        const detectionPromises = this.safetyModules.map(async (module) => {
+          try {
+            const isApplicable = await module.detector.detect(migration);
+            return { module, isApplicable };
+          } catch (error) {
+            console.warn(`Error detecting enhancement ${module.enhancement.id}:`, error);
+            return { module, isApplicable: false };
+          }
+        });
+        const results = await Promise.all(detectionPromises);
+        results.forEach(({ module, isApplicable }) => {
+          if (isApplicable) {
+            applicableEnhancements.push(module.enhancement);
+          }
+        });
+        this.cacheEnhancements(cacheKey, applicableEnhancements);
+        return applicableEnhancements;
+      }
+      /**
+       * Detect applicable speed enhancements for a migration
+       * @param migration Migration file to analyze
+       * @returns Array of applicable speed enhancements with analysis
+       */
+      async detectSpeedEnhancements(migration) {
+        await this.initialize();
+        const applicableEnhancements = [];
+        const cacheKey = `speed_${migration.name}_${migration.up.length}`;
+        if (this.detectionCache.has(cacheKey)) {
+          return this.getCachedEnhancements(cacheKey, this.speedModules);
+        }
+        const detectionPromises = this.speedModules.map(async (module) => {
+          try {
+            const isApplicable = await module.detector.detect(migration);
+            return { module, isApplicable };
+          } catch (error) {
+            console.warn(`Error detecting enhancement ${module.enhancement.id}:`, error);
+            return { module, isApplicable: false };
+          }
+        });
+        const results = await Promise.all(detectionPromises);
+        results.forEach(({ module, isApplicable }) => {
+          if (isApplicable) {
+            applicableEnhancements.push(module.enhancement);
+          }
+        });
+        this.cacheEnhancements(cacheKey, applicableEnhancements);
+        return applicableEnhancements;
+      }
+      /**
+       * Get detailed analysis for a specific enhancement
+       * @param enhancementId Enhancement ID to analyze
+       * @param migration Migration file to analyze
+       * @returns Detailed analysis of the enhancement
+       */
+      async getEnhancementAnalysis(enhancementId, migration) {
+        await this.initialize();
+        const cacheKey = `analysis_${enhancementId}_${migration.name}_${migration.up.length}`;
+        if (this.analysisCache.has(cacheKey)) {
+          return this.analysisCache.get(cacheKey);
+        }
+        const module = this.moduleCache.get(enhancementId);
+        if (!module) return null;
+        try {
+          const analysis = await module.detector.analyze(migration);
+          if (analysis) {
+            this.analysisCache.set(cacheKey, analysis);
+          }
+          return analysis;
+        } catch (error) {
+          console.warn(`Error analyzing enhancement ${enhancementId}:`, error);
+          return null;
+        }
+      }
+      /**
+       * Apply a set of enhancements to migration content
+       * @param content Original migration content
+       * @param migration Migration file object
+       * @param enhancements Array of enhancements to apply
+       * @returns Modified content with all enhancements applied
+       */
+      async applyEnhancements(content, migration, enhancements) {
+        await this.initialize();
+        let modifiedContent = content;
+        const results = [];
+        const sortedEnhancements = [...enhancements].sort((a, b) => b.priority - a.priority);
+        for (const enhancement14 of sortedEnhancements) {
+          const module = this.moduleCache.get(enhancement14.id);
+          if (!module) {
+            console.warn(`Enhancement module not found: ${enhancement14.id}`);
+            continue;
+          }
+          try {
+            const updatedMigration = { ...migration, up: modifiedContent };
+            const result = await module.applicator.apply(modifiedContent, updatedMigration);
+            if (result.applied) {
+              modifiedContent = result.modifiedContent;
+              results.push(result);
+            }
+          } catch (error) {
+            console.warn(`Error applying enhancement ${enhancement14.id}:`, error);
+          }
+        }
+        return modifiedContent;
+      }
+      /**
+       * Apply a single enhancement to migration content
+       * @param content Original migration content
+       * @param migration Migration file object
+       * @param enhancement Enhancement to apply
+       * @returns Enhancement result
+       */
+      async applySingleEnhancement(content, migration, enhancement14) {
+        await this.initialize();
+        const module = this.moduleCache.get(enhancement14.id);
+        if (!module) {
+          throw new Error(`Enhancement module not found: ${enhancement14.id}`);
+        }
+        return await module.applicator.apply(content, migration);
+      }
+      /**
+       * Find an enhancement module by ID (now using cache for O(1) lookup)
+       * @param enhancementId Enhancement ID to find
+       * @returns Enhancement module or undefined if not found
+       */
+      findEnhancementModule(enhancementId) {
+        return this.moduleCache.get(enhancementId);
+      }
+      /**
+       * Cache enhancement detection results
+       */
+      cacheEnhancements(cacheKey, enhancements) {
+        const enhancementIds = enhancements.map((e) => e.id);
+        this.detectionCache.set(cacheKey, enhancementIds.length > 0);
+      }
+      /**
+       * Get cached enhancements
+       */
+      getCachedEnhancements(cacheKey, modules) {
+        return [];
+      }
+      /**
+       * Clear all caches (useful for testing or when migration changes)
+       */
+      clearCache() {
+        this.analysisCache.clear();
+        this.detectionCache.clear();
+      }
+      /**
+       * Get cache statistics for debugging
+       */
+      getCacheStats() {
+        return {
+          analysisCache: this.analysisCache.size,
+          detectionCache: this.detectionCache.size
+        };
+      }
+      /**
+       * Check if an enhancement is available
+       * @param enhancementId Enhancement ID to check
+       * @returns True if enhancement is available
+       */
+      async hasEnhancement(enhancementId) {
+        await this.initialize();
+        return this.moduleCache.has(enhancementId);
+      }
+      /**
+       * Get a specific enhancement by ID
+       * @param enhancementId Enhancement ID to get
+       * @returns Enhancement definition or undefined if not found
+       */
+      async getEnhancement(enhancementId) {
+        await this.initialize();
+        const module = this.moduleCache.get(enhancementId);
+        return module?.enhancement;
+      }
+      /**
+       * Get all available safety enhancements
+       * @returns Array of all safety enhancement definitions
+       */
+      async getAllSafetyEnhancements() {
+        await this.initialize();
+        return this.safetyModules.map((module) => module.enhancement);
+      }
+      /**
+       * Get all available speed enhancements
+       * @returns Array of all speed enhancement definitions
+       */
+      async getAllSpeedEnhancements() {
+        await this.initialize();
+        return this.speedModules.map((module) => module.enhancement);
+      }
+      /**
+       * Get all available enhancements (both safety and speed)
+       * @returns Array of all enhancement definitions
+       */
+      async getAllEnhancements() {
+        await this.initialize();
+        return [
+          ...this.safetyModules.map((module) => module.enhancement),
+          ...this.speedModules.map((module) => module.enhancement)
+        ];
+      }
+      /**
+       * Get engine statistics including performance metrics
+       * @returns Statistics about the enhancement engine
+       */
+      async getStats() {
+        await this.initialize();
+        const allEnhancements = await this.getAllEnhancements();
+        const enhancementsByPriority = {};
+        allEnhancements.forEach((enhancement14) => {
+          enhancementsByPriority[enhancement14.priority] = (enhancementsByPriority[enhancement14.priority] || 0) + 1;
+        });
+        return {
+          totalEnhancements: allEnhancements.length,
+          safetyEnhancements: this.safetyModules.length,
+          speedEnhancements: this.speedModules.length,
+          enhancementsByPriority,
+          cacheStats: this.getCacheStats()
+        };
+      }
+    };
+  }
+});
+
+// src/core/migration-utils.ts
+import fs from "fs-extra";
+import path from "path";
+import crypto from "crypto";
+import pkg2 from "node-sql-parser";
+async function findLatestMigration(migrationsDir) {
+  try {
+    const files = await fs.readdir(migrationsDir);
+    const migrationFiles = files.filter((file) => file.endsWith(".sql")).sort((a, b) => {
+      const aPrefix = a.split("_")[0];
+      const bPrefix = b.split("_")[0];
+      return bPrefix.localeCompare(aPrefix);
+    });
+    return migrationFiles.length > 0 ? migrationFiles[0] : null;
+  } catch (error) {
+    return null;
+  }
+}
+async function parseMigrationFile(filePath) {
+  const content = await fs.readFile(filePath, "utf-8");
+  const fileName = path.basename(filePath);
+  const checksum = crypto.createHash("sha256").update(content).digest("hex");
+  const timestamp = extractTimestampFromFilename(fileName);
+  const operations = await parseSqlOperations(content);
+  const upContent = content;
+  const downContent = "";
+  return {
+    path: filePath,
+    name: fileName,
+    up: upContent,
+    down: downContent,
+    timestamp,
+    operations,
+    checksum
+  };
+}
+function extractTimestampFromFilename(filename) {
+  const timestampMatch = filename.match(/^(\d{4})_/);
+  if (timestampMatch) {
+    const year = (/* @__PURE__ */ new Date()).getFullYear();
+    const month = (/* @__PURE__ */ new Date()).getMonth();
+    const day = (/* @__PURE__ */ new Date()).getDate();
+    return new Date(year, month, day, 0, 0, 0, parseInt(timestampMatch[1]));
+  }
+  return /* @__PURE__ */ new Date();
+}
+async function parseSqlOperations(content) {
+  const operations = [];
+  const parser = new Parser2();
+  const statements = content.split(/(--> statement-breakpoint|;)/i).map((stmt) => stmt.trim()).filter((stmt) => stmt && !stmt.match(/^--> statement-breakpoint$/i) && stmt !== ";");
+  let lineNumber = 1;
+  for (const statement of statements) {
+    if (!statement.trim()) continue;
+    try {
+      const ast = parser.astify(statement, { database: "sqlite" });
+      const operation = extractOperationFromAst(ast, statement, lineNumber);
+      if (operation) {
+        operations.push(operation);
+      }
+    } catch (error) {
+      operations.push({
+        type: "OTHER",
+        sql: statement,
+        line: lineNumber
+      });
+    }
+    lineNumber += (statement.match(/\n/g) || []).length + 1;
+  }
+  return operations;
+}
+function extractOperationFromAst(ast, sql, line) {
+  if (!ast || !ast.type) return null;
+  const operation = {
+    type: "OTHER",
+    sql,
+    line
+  };
+  switch (ast.type?.toLowerCase()) {
+    case "create":
+      if (ast.keyword === "table") {
+        operation.type = "CREATE_TABLE";
+        operation.table = ast.table?.[0]?.table || extractTableNameFromSql(sql);
+      } else if (ast.keyword === "index") {
+        operation.type = "CREATE_INDEX";
+        operation.index = ast.index || extractIndexNameFromSql(sql);
+        operation.table = ast.table?.[0]?.table || extractTableNameFromIndexSql(sql);
+      }
+      break;
+    case "drop":
+      if (ast.keyword === "table") {
+        operation.type = "DROP_TABLE";
+        operation.table = ast.name?.[0]?.table || extractTableNameFromSql(sql);
+      } else if (ast.keyword === "index") {
+        operation.type = "DROP_INDEX";
+        operation.index = ast.name || extractIndexNameFromSql(sql);
+      }
+      break;
+    case "alter":
+      operation.type = "ALTER_TABLE";
+      operation.table = ast.table?.[0]?.table || extractTableNameFromSql(sql);
+      break;
+    case "insert":
+      operation.type = "INSERT";
+      operation.table = ast.table?.[0]?.table || extractTableNameFromSql(sql);
+      break;
+    case "update":
+      operation.type = "UPDATE";
+      operation.table = ast.table?.[0]?.table || extractTableNameFromSql(sql);
+      break;
+    case "delete":
+      operation.type = "DELETE";
+      operation.table = ast.table?.[0]?.table || extractTableNameFromSql(sql);
+      break;
+  }
+  return operation;
+}
+function extractTableNameFromSql(sql) {
+  const patterns = [
+    /CREATE\s+TABLE\s+`?([^`\s\(]+)`?/i,
+    /DROP\s+TABLE\s+`?([^`\s\(]+)`?/i,
+    /ALTER\s+TABLE\s+`?([^`\s\(]+)`?/i,
+    /INSERT\s+INTO\s+`?([^`\s\(]+)`?/i,
+    /UPDATE\s+`?([^`\s\(]+)`?/i,
+    /DELETE\s+FROM\s+`?([^`\s\(]+)`?/i
+  ];
+  for (const pattern of patterns) {
+    const match = sql.match(pattern);
+    if (match) {
+      return match[1];
+    }
+  }
+  return void 0;
+}
+function extractIndexNameFromSql(sql) {
+  const patterns = [
+    /CREATE\s+(?:UNIQUE\s+)?INDEX\s+`?([^`\s\(]+)`?/i,
+    /DROP\s+INDEX\s+`?([^`\s\(]+)`?/i
+  ];
+  for (const pattern of patterns) {
+    const match = sql.match(pattern);
+    if (match) {
+      return match[1];
+    }
+  }
+  return void 0;
+}
+function extractTableNameFromIndexSql(sql) {
+  const match = sql.match(/ON\s+`?([^`\s\(]+)`?/i);
+  return match ? match[1] : void 0;
+}
+function isMigrationFile(filePath) {
+  return path.extname(filePath).toLowerCase() === ".sql";
+}
+async function validateMigrationPath(filePath, migrationsDir) {
+  let resolvedPath;
+  if (path.isAbsolute(filePath)) {
+    resolvedPath = filePath;
+  } else {
+    resolvedPath = path.resolve(migrationsDir, filePath);
+  }
+  if (!await fs.pathExists(resolvedPath)) {
+    throw new Error(`Migration file not found: ${resolvedPath}`);
+  }
+  if (!isMigrationFile(resolvedPath)) {
+    throw new Error(`File is not a migration file: ${resolvedPath}`);
+  }
+  return resolvedPath;
+}
+var Parser2;
+var init_migration_utils = __esm({
+  "src/core/migration-utils.ts"() {
+    "use strict";
+    ({ Parser: Parser2 } = pkg2);
+  }
+});
+
+// src/commands/enhance.ts
+var enhance_exports = {};
+__export(enhance_exports, {
+  enhanceCommand: () => enhanceCommand
+});
+import { confirm as confirm2, log as log2 } from "@clack/prompts";
+import fs2 from "fs-extra";
+import path2 from "path";
+import pc from "picocolors";
+async function enhanceCommand(options, globalOptions) {
+  const spinner2 = createFlowSpinner();
+  try {
+    const projectPath = options.project ? path2.resolve(options.project) : process.cwd();
+    const cfg = await getFlowConfig(globalOptions, projectPath);
+    const envCfg = cfg.environments[cfg.defaultEnvironment];
+    const migrationsDir = envCfg.migrationsPath || "./migrations";
+    const absoluteMigrationsDir = path2.resolve(projectPath, migrationsDir);
+    let migrationFile = options.file;
+    if (!migrationFile) {
+      const latestFile = await findLatestMigration(absoluteMigrationsDir);
+      if (!latestFile) {
+        displayError("No migration files found", [`Directory: ${absoluteMigrationsDir}`]);
+        return;
+      }
+      migrationFile = latestFile;
+      displayInfo(`Operating on latest migration: ${pc.cyan(migrationFile)}`);
+    }
+    let filePath;
+    try {
+      filePath = await validateMigrationPath(migrationFile, absoluteMigrationsDir);
+    } catch (error) {
+      displayError("Migration file validation failed", [error instanceof Error ? error.message : "Migration file not found"]);
+      return;
+    }
+    const loadSpinner = spinner2.start("Loading migration file...");
+    let migration, engine;
+    try {
+      [migration, engine] = await Promise.all([
+        parseMigrationFile(filePath),
+        new Promise((resolve4) => {
+          const eng = new EnhancementEngine();
+          resolve4(eng);
+        })
+      ]);
+      loadSpinner.succeed("Migration file loaded successfully");
+    } catch (error) {
+      loadSpinner.fail("Failed to load migration file");
+      displayError("Parse error", [error instanceof Error ? error.message : "Unknown error"]);
+      return;
+    }
+    log2.info("");
+    displayInfo(`\u{1F680} Starting Enhancement Process for ${pc.bold(migration.name)}`);
+    log2.info("");
+    log2.info(pc.bold(pc.blue("\u2501\u2501\u2501 Phase 1: Safety Enhancements \u2501\u2501\u2501")));
+    const safetySpinner = spinner2.start("Scanning for safety issues...");
+    try {
+      const safetyEnhancements = await engine.detectSafetyEnhancements(migration);
+      if (safetyEnhancements.length > 0) {
+        safetySpinner.succeed(`Found ${safetyEnhancements.length} safety issue(s)`);
+        for (const enhancement14 of safetyEnhancements) {
+          const analysis = await engine.getEnhancementAnalysis(enhancement14.id, migration);
+          if (analysis && analysis.issues.length > 0) {
+            displayWarning(`${enhancement14.name}`, [enhancement14.description]);
+            for (const issue of analysis.issues) {
+              log2.info(`    ${pc.red("\u26A0")} ${issue.description} ${pc.gray(`(line ${issue.line})`)}`);
+              log2.info(`    ${pc.gray("\u2192 " + issue.recommendation)}`);
+            }
+            log2.info("");
+          } else {
+            displayInfo(`${enhancement14.name}`, [enhancement14.description]);
+          }
+        }
+        const applySafety = await confirm2({
+          message: pc.cyan("Apply recommended safety enhancements?"),
+          initialValue: true
+        });
+        if (applySafety) {
+          const applySpinner = spinner2.start("Applying safety enhancements...");
+          try {
+            const enhancedContent = await engine.applyEnhancements(migration.up, migration, safetyEnhancements);
+            await fs2.writeFile(filePath, enhancedContent, "utf-8");
+            migration.up = enhancedContent;
+            applySpinner.succeed("Safety enhancements applied successfully");
+            displaySuccess("Safety improvements completed", [`Applied ${safetyEnhancements.length} enhancement(s)`]);
+          } catch (error) {
+            applySpinner.fail("Failed to apply safety enhancements");
+            displayError("Enhancement error", [error instanceof Error ? error.message : "Unknown error"]);
+            return;
+          }
+        } else {
+          displayInfo("Skipping safety enhancements");
+        }
+      } else {
+        safetySpinner.succeed("No safety issues found - migration looks safe!");
+      }
+    } catch (error) {
+      safetySpinner.fail("Error during safety analysis");
+      displayError("Analysis failed", [error instanceof Error ? error.message : "Unknown error"]);
+      return;
+    }
+    log2.info("");
+    log2.info(pc.bold(pc.green("\u2501\u2501\u2501 Phase 2: Speed Enhancements \u2501\u2501\u2501")));
+    const speedSpinner = spinner2.start("Analyzing performance optimization opportunities...");
+    try {
+      const speedEnhancements = await engine.detectSpeedEnhancements(migration);
+      if (speedEnhancements.length > 0) {
+        speedSpinner.succeed(`Found ${speedEnhancements.length} optimization opportunity(ies)`);
+        for (const enhancement14 of speedEnhancements) {
+          const analysis = await engine.getEnhancementAnalysis(enhancement14.id, migration);
+          if (analysis && analysis.issues.length > 0) {
+            displayInfo(`${enhancement14.name}`, [enhancement14.description]);
+            for (const issue of analysis.issues) {
+              log2.info(`    ${pc.yellow("\u26A1")} ${issue.description} ${pc.gray(`(line ${issue.line})`)}`);
+              log2.info(`    ${pc.gray("\u2192 " + issue.recommendation)}`);
+            }
+            log2.info("");
+          } else {
+            displayInfo(`${enhancement14.name}`, [enhancement14.description]);
+          }
+        }
+        const applySpeed = await confirm2({
+          message: pc.cyan("Apply recommended speed enhancements?"),
+          initialValue: true
+        });
+        if (applySpeed) {
+          const applySpinner = spinner2.start("Applying speed enhancements...");
+          try {
+            const enhancedContent = await engine.applyEnhancements(migration.up, migration, speedEnhancements);
+            await fs2.writeFile(filePath, enhancedContent, "utf-8");
+            applySpinner.succeed("Speed enhancements applied successfully");
+            displaySuccess("Performance optimizations completed", [`Applied ${speedEnhancements.length} enhancement(s)`]);
+          } catch (error) {
+            applySpinner.fail("Failed to apply speed enhancements");
+            displayError("Enhancement error", [error instanceof Error ? error.message : "Unknown error"]);
+            return;
+          }
+        } else {
+          displayInfo("Skipping speed enhancements");
+        }
+      } else {
+        speedSpinner.succeed("No speed optimizations found - migration is already optimized!");
+      }
+    } catch (error) {
+      speedSpinner.fail("Error during speed analysis");
+      displayError("Analysis failed", [error instanceof Error ? error.message : "Unknown error"]);
+      return;
+    }
+    log2.info("");
+    displaySuccess("\u2728 Enhancement process completed successfully!", [
+      `Enhanced migration file: ${pc.cyan(path2.relative(projectPath, filePath))}`
+    ]);
+  } catch (error) {
+    displayError("Enhancement command failed", [error instanceof Error ? error.message : "Unknown error"]);
+  }
+}
+var init_enhance = __esm({
+  "src/commands/enhance.ts"() {
+    "use strict";
+    init_config();
+    init_prompts();
+    init_enhancement_engine();
+    init_migration_utils();
+  }
+});
+
+// src/commands/validate.ts
+var validate_exports = {};
+__export(validate_exports, {
+  validateCommand: () => validateCommand
+});
+import { intro, outro } from "@clack/prompts";
+import fs3 from "fs-extra";
+import path3 from "path";
+import pc2 from "picocolors";
+async function validateCommand(options, globalOptions) {
+  const projectPath = options.project ? path3.resolve(options.project) : process.cwd();
+  const cfg = await getFlowConfig(globalOptions, projectPath);
+  const envCfg = cfg.environments[cfg.defaultEnvironment];
+  const migrationsDir = envCfg.migrationsPath || "./migrations";
+  const absoluteMigrationsDir = path3.resolve(projectPath, migrationsDir);
+  let migrationFile = options.file;
+  if (!migrationFile) {
+    const files = await fs3.readdir(absoluteMigrationsDir);
+    const migrationFiles = files.filter((file) => file.endsWith(".sql")).sort();
+    if (migrationFiles.length === 0) {
+      console.log(pc2.yellow("No migration files found."));
+      return;
+    }
+    migrationFile = migrationFiles[migrationFiles.length - 1];
+  }
+  const filePath = path3.join(absoluteMigrationsDir, migrationFile);
+  if (!await fs3.pathExists(filePath)) {
+    console.log(pc2.red(`File not found: ${filePath}`));
+    return;
+  }
+  const content = await fs3.readFile(filePath, "utf-8");
+  const engine = new EnhancementEngine();
+  intro("\u{1F50D} Starting Validation Process");
+  const safetySpinner = createSpinner("Checking for safety issues...").start();
+  const safetyEnhancements = await engine.detectSafetyEnhancements({
+    path: filePath,
+    name: migrationFile,
+    up: content,
+    down: "",
+    timestamp: /* @__PURE__ */ new Date(),
+    operations: [],
+    checksum: ""
+  });
+  if (safetyEnhancements.length > 0) {
+    safetySpinner.stop("\u{1F50D} Safety issues found:");
+    safetyEnhancements.forEach((e) => {
+      console.log(`  - ${pc2.yellow(e.name)}: ${e.description}`);
+    });
+  } else {
+    safetySpinner.succeed("\u2705 No safety issues found.");
+  }
+  outro("\u2705 Validation complete.");
+}
+var init_validate = __esm({
+  "src/commands/validate.ts"() {
+    "use strict";
+    init_config();
+    init_prompts();
+    init_enhancement_engine();
+  }
+});
+
+// src/commands/plan.ts
+var plan_exports = {};
+__export(plan_exports, {
+  planCommand: () => planCommand
+});
+import { intro as intro2, outro as outro2 } from "@clack/prompts";
+import fs4 from "fs-extra";
+import path4 from "path";
+import pc3 from "picocolors";
+import { diffChars } from "diff";
+async function planCommand(options, globalOptions) {
+  const projectPath = options.project ? path4.resolve(options.project) : process.cwd();
+  const cfg = await getFlowConfig(globalOptions, projectPath);
+  const envCfg = cfg.environments[cfg.defaultEnvironment];
+  const migrationsDir = envCfg.migrationsPath || "./migrations";
+  const absoluteMigrationsDir = path4.resolve(projectPath, migrationsDir);
+  let migrationFile = options.file;
+  if (!migrationFile) {
+    const files = await fs4.readdir(absoluteMigrationsDir);
+    const migrationFiles = files.filter((file) => file.endsWith(".sql")).sort();
+    if (migrationFiles.length === 0) {
+      console.log(pc3.yellow("No migration files found."));
+      return;
+    }
+    migrationFile = migrationFiles[migrationFiles.length - 1];
+  }
+  const filePath = path4.join(absoluteMigrationsDir, migrationFile);
+  if (!await fs4.pathExists(filePath)) {
+    console.log(pc3.red(`File not found: ${filePath}`));
+    return;
+  }
+  const content = await fs4.readFile(filePath, "utf-8");
+  const engine = new EnhancementEngine();
+  intro2("\u{1F4DD} Planning Enhancement");
+  const safetyEnhancements = await engine.detectSafetyEnhancements({
+    path: filePath,
+    name: migrationFile,
+    up: content,
+    down: "",
+    timestamp: /* @__PURE__ */ new Date(),
+    operations: [],
+    checksum: ""
+  });
+  const speedEnhancements = await engine.detectSpeedEnhancements({
+    path: filePath,
+    name: migrationFile,
+    up: content,
+    down: "",
+    timestamp: /* @__PURE__ */ new Date(),
+    operations: [],
+    checksum: ""
+  });
+  const allEnhancements = [...safetyEnhancements, ...speedEnhancements];
+  if (allEnhancements.length > 0) {
+    const newContent = await engine.applyEnhancements(content, allEnhancements);
+    const diff = diffChars(content, newContent);
+    console.log(pc3.bold(`
+Changes for ${migrationFile}:
+`));
+    diff.forEach((part) => {
+      const color = part.added ? pc3.green : part.removed ? pc3.red : pc3.gray;
+      process.stdout.write(color(part.value));
+    });
+    console.log();
+  } else {
+    console.log(pc3.green("\u2705 No enhancements to apply."));
+  }
+  outro2("\u{1F4DD} Plan complete.");
+}
+var init_plan = __esm({
+  "src/commands/plan.ts"() {
+    "use strict";
+    init_config();
+    init_enhancement_engine();
+  }
+});
+
+// src/commands/rollback.ts
+var rollback_exports = {};
+__export(rollback_exports, {
+  rollbackCommand: () => rollbackCommand
+});
+import { intro as intro3, outro as outro3 } from "@clack/prompts";
+import fs5 from "fs-extra";
+import path5 from "path";
+import pc4 from "picocolors";
+async function rollbackCommand(options, globalOptions) {
+  const projectPath = options.project ? path5.resolve(options.project) : process.cwd();
+  const cfg = await getFlowConfig(globalOptions, projectPath);
+  const envCfg = cfg.environments[cfg.defaultEnvironment];
+  const migrationsDir = envCfg.migrationsPath || "./migrations";
+  const absoluteMigrationsDir = path5.resolve(projectPath, migrationsDir);
+  let migrationFile = options.file;
+  if (!migrationFile) {
+    const files = await fs5.readdir(absoluteMigrationsDir);
+    const migrationFiles = files.filter((file) => file.endsWith(".sql")).sort();
+    if (migrationFiles.length === 0) {
+      console.log(pc4.yellow("No migration files found."));
+      return;
+    }
+    migrationFile = migrationFiles[migrationFiles.length - 1];
+  }
+  const filePath = path5.join(absoluteMigrationsDir, migrationFile);
+  if (!await fs5.pathExists(filePath)) {
+    console.log(pc4.red(`File not found: ${filePath}`));
+    return;
+  }
+  const content = await fs5.readFile(filePath, "utf-8");
+  const engine = new EnhancementEngine();
+  intro3("\u23EA Generating Rollback Script");
+  const rollbackScript = await engine.generateRollback({
+    path: filePath,
+    name: migrationFile,
+    up: content,
+    down: "",
+    timestamp: /* @__PURE__ */ new Date(),
+    operations: [],
+    checksum: ""
+  });
+  console.log(pc4.bold(`
+Rollback script for ${migrationFile}:
+`));
+  console.log(pc4.cyan(rollbackScript));
+  outro3("\u23EA Rollback script generated.");
+}
+var init_rollback = __esm({
+  "src/commands/rollback.ts"() {
+    "use strict";
+    init_config();
+    init_enhancement_engine();
+  }
+});
+
+// src/core/types/common.ts
+var init_common = __esm({
+  "src/core/types/common.ts"() {
+    "use strict";
+  }
+});
+
+// src/core/types/orm.ts
+var init_orm = __esm({
+  "src/core/types/orm.ts"() {
+    "use strict";
+  }
+});
+
+// src/core/types/database.ts
+var init_database = __esm({
+  "src/core/types/database.ts"() {
+    "use strict";
+  }
+});
+
+// src/core/types/migration.ts
+var init_migration = __esm({
+  "src/core/types/migration.ts"() {
+    "use strict";
+  }
+});
+
+// src/core/types/config.ts
+var init_config2 = __esm({
+  "src/core/types/config.ts"() {
+    "use strict";
+  }
+});
+
+// src/core/types/index.ts
+var init_types = __esm({
+  "src/core/types/index.ts"() {
+    "use strict";
+    init_common();
+    init_orm();
+    init_database();
+    init_migration();
+    init_config2();
+  }
+});
 
 // src/core/utils/file-utils.ts
-import fs from "fs-extra";
-import { join, resolve, relative } from "path";
-var { readFile, writeFile, access, stat, readdir } = fs;
-async function exists(path8) {
+import fs6 from "fs-extra";
+import { join, resolve as resolve2, relative } from "path";
+async function exists(path9) {
   try {
-    await access(path8);
+    await access(path9);
     return true;
   } catch {
     return false;
   }
 }
-async function createFilePath(path8, basePath = process.cwd()) {
-  const absolutePath = resolve(basePath, path8);
+async function createFilePath(path9, basePath = process.cwd()) {
+  const absolutePath = resolve2(basePath, path9);
   const relativePath = relative(basePath, absolutePath);
   const fileExists = await exists(absolutePath);
   return {
@@ -63,9 +2537,9 @@ async function createFilePath(path8, basePath = process.cwd()) {
     exists: fileExists
   };
 }
-async function readFileContent(path8) {
+async function readFileContent(path9) {
   try {
-    const content = await readFile(path8, "utf-8");
+    const content = await readFile(path9, "utf-8");
     return { success: true, data: content };
   } catch (error) {
     return {
@@ -91,8 +2565,8 @@ async function findFiles(directory, pattern, recursive = true) {
   }
   return files;
 }
-async function readJsonFile(path8) {
-  const fileResult = await readFileContent(path8);
+async function readJsonFile(path9) {
+  const fileResult = await readFileContent(path9);
   if (!fileResult.success) {
     return fileResult;
   }
@@ -102,623 +2576,762 @@ async function readJsonFile(path8) {
   } catch (error) {
     return {
       success: false,
-      error: new Error(`Invalid JSON in file ${path8}: ${error instanceof Error ? error.message : "Unknown error"}`)
+      error: new Error(`Invalid JSON in file ${path9}: ${error instanceof Error ? error.message : "Unknown error"}`)
     };
   }
 }
+var readFile, writeFile, access, stat, readdir;
+var init_file_utils = __esm({
+  "src/core/utils/file-utils.ts"() {
+    "use strict";
+    ({ readFile, writeFile, access, stat, readdir } = fs6);
+  }
+});
+
+// src/core/utils/async-utils.ts
+var init_async_utils = __esm({
+  "src/core/utils/async-utils.ts"() {
+    "use strict";
+  }
+});
+
+// src/core/utils/validation.ts
+var init_validation = __esm({
+  "src/core/utils/validation.ts"() {
+    "use strict";
+  }
+});
 
 // src/core/utils/config.ts
-import fs2 from "fs-extra";
-import path from "path";
+import fs7 from "fs-extra";
+import path6 from "path";
+var init_config3 = __esm({
+  "src/core/utils/config.ts"() {
+    "use strict";
+    init_validation();
+  }
+});
+
+// src/core/utils/index.ts
+var init_utils = __esm({
+  "src/core/utils/index.ts"() {
+    "use strict";
+    init_file_utils();
+    init_async_utils();
+    init_validation();
+    init_config3();
+  }
+});
+
+// src/core/index.ts
+var init_core = __esm({
+  "src/core/index.ts"() {
+    "use strict";
+    init_types();
+    init_utils();
+  }
+});
 
 // src/analyzer/orm-detectors/base-detector.ts
-var BaseORMDetector = class {
-  /**
-   * Common helper: Check if package.json contains specific dependencies
-   */
-  async checkPackageJsonDependencies(projectPath, dependencies) {
-    const packageJsonPath = join2(projectPath, "package.json");
-    const packageResult = await readJsonFile(packageJsonPath);
-    if (!packageResult.success) {
-      return { found: [], missing: dependencies };
-    }
-    const allDeps = {
-      ...packageResult.data.dependencies,
-      ...packageResult.data.devDependencies
-    };
-    const found = dependencies.filter((dep) => dep in allDeps);
-    const missing = dependencies.filter((dep) => !(dep in allDeps));
-    return { found, missing };
-  }
-  /**
-   * Common helper: Check if specific files exist
-   */
-  async checkFiles(projectPath, filePaths) {
-    const existing = [];
-    const missing = [];
-    for (const filePath of filePaths) {
-      const fullPath = join2(projectPath, filePath);
-      const fileExists = await exists(fullPath);
-      if (fileExists) {
-        existing.push(await createFilePath(filePath, projectPath));
-      } else {
-        missing.push(filePath);
+import { join as join2 } from "path";
+var BaseORMDetector;
+var init_base_detector = __esm({
+  "src/analyzer/orm-detectors/base-detector.ts"() {
+    "use strict";
+    init_core();
+    BaseORMDetector = class {
+      /**
+       * Common helper: Check if package.json contains specific dependencies
+       */
+      async checkPackageJsonDependencies(projectPath, dependencies) {
+        const packageJsonPath = join2(projectPath, "package.json");
+        const packageResult = await readJsonFile(packageJsonPath);
+        if (!packageResult.success) {
+          return { found: [], missing: dependencies };
+        }
+        const allDeps = {
+          ...packageResult.data.dependencies,
+          ...packageResult.data.devDependencies
+        };
+        const found = dependencies.filter((dep) => dep in allDeps);
+        const missing = dependencies.filter((dep) => !(dep in allDeps));
+        return { found, missing };
       }
-    }
-    return { existing, missing };
-  }
-  /**
-   * Common helper: Find files matching patterns
-   */
-  async findFilesByPattern(projectPath, patterns, directories = ["."]) {
-    const allFiles = [];
-    for (const directory of directories) {
-      const fullDirectory = join2(projectPath, directory);
-      for (const pattern of patterns) {
-        const files = await findFiles(fullDirectory, pattern, true);
-        allFiles.push(...files);
+      /**
+       * Common helper: Check if specific files exist
+       */
+      async checkFiles(projectPath, filePaths) {
+        const existing = [];
+        const missing = [];
+        for (const filePath of filePaths) {
+          const fullPath = join2(projectPath, filePath);
+          const fileExists = await exists(fullPath);
+          if (fileExists) {
+            existing.push(await createFilePath(filePath, projectPath));
+          } else {
+            missing.push(filePath);
+          }
+        }
+        return { existing, missing };
       }
-    }
-    return allFiles;
-  }
-  /**
-   * Common helper: Calculate confidence score based on evidence
-   */
-  calculateConfidence(evidence) {
-    if (evidence.required.total === 0) {
-      return 0;
-    }
-    const requiredScore = evidence.required.found / evidence.required.total;
-    const optionalScore = evidence.optional.total > 0 ? evidence.optional.found / evidence.optional.total : 0;
-    const baseScore = requiredScore * 0.7;
-    const bonusScore = optionalScore * 0.3;
-    const penalty = Math.min(evidence.negative * 0.1, 0.5);
-    return Math.max(0, Math.min(1, baseScore + bonusScore - penalty));
-  }
-  /**
-   * Parse database URL into DatabaseConfig
-   */
-  parseDatabaseUrl(url) {
-    try {
-      const parsed = new URL(url);
-      let type;
-      switch (parsed.protocol) {
-        case "postgresql:":
-        case "postgres:":
-          type = "postgresql";
-          break;
-        case "mysql:":
-          type = "mysql";
-          break;
-        case "sqlite:":
-          type = "sqlite";
-          break;
-        default:
+      /**
+       * Common helper: Find files matching patterns
+       */
+      async findFilesByPattern(projectPath, patterns, directories = ["."]) {
+        const allFiles = [];
+        for (const directory of directories) {
+          const fullDirectory = join2(projectPath, directory);
+          for (const pattern of patterns) {
+            const files = await findFiles(fullDirectory, pattern, true);
+            allFiles.push(...files);
+          }
+        }
+        return allFiles;
+      }
+      /**
+       * Common helper: Calculate confidence score based on evidence
+       */
+      calculateConfidence(evidence) {
+        if (evidence.required.total === 0) {
+          return 0;
+        }
+        const requiredScore = evidence.required.found / evidence.required.total;
+        const optionalScore = evidence.optional.total > 0 ? evidence.optional.found / evidence.optional.total : 0;
+        const baseScore = requiredScore * 0.7;
+        const bonusScore = optionalScore * 0.3;
+        const penalty = Math.min(evidence.negative * 0.1, 0.5);
+        return Math.max(0, Math.min(1, baseScore + bonusScore - penalty));
+      }
+      /**
+       * Parse database URL into DatabaseConfig
+       */
+      parseDatabaseUrl(url) {
+        try {
+          const parsed = new URL(url);
+          let type;
+          switch (parsed.protocol) {
+            case "postgresql:":
+            case "postgres:":
+              type = "postgresql";
+              break;
+            case "mysql:":
+              type = "mysql";
+              break;
+            case "sqlite:":
+              type = "sqlite";
+              break;
+            default:
+              return null;
+          }
+          return {
+            type,
+            host: parsed.hostname || void 0,
+            port: parsed.port ? parseInt(parsed.port) : void 0,
+            database: parsed.pathname.slice(1),
+            // Remove leading slash
+            username: parsed.username || void 0,
+            password: parsed.password || void 0,
+            url
+          };
+        } catch {
           return null;
+        }
       }
-      return {
-        type,
-        host: parsed.hostname || void 0,
-        port: parsed.port ? parseInt(parsed.port) : void 0,
-        database: parsed.pathname.slice(1),
-        // Remove leading slash
-        username: parsed.username || void 0,
-        password: parsed.password || void 0,
-        url
-      };
-    } catch {
-      return null;
-    }
+    };
   }
-};
+});
 
 // src/analyzer/orm-detectors/prisma-detector.ts
-var PrismaDetector = class extends BaseORMDetector {
-  name = "prisma";
-  /**
-   * Detect Prisma in the project
-   */
-  async detect(projectPath) {
-    const evidence = [];
-    const warnings2 = [];
-    const { found: foundDeps, missing: missingDeps } = await this.checkPackageJsonDependencies(
-      projectPath,
-      ["prisma", "@prisma/client"]
-    );
-    evidence.push(...foundDeps.map((dep) => `Found dependency: ${dep}`));
-    const { existing: schemaFiles } = await this.checkFiles(projectPath, [
-      "prisma/schema.prisma",
-      "schema.prisma"
-    ]);
-    if (schemaFiles.length > 0) {
-      evidence.push(`Found schema file: ${schemaFiles[0].relative}`);
-    }
-    const { existing: migrationDirs } = await this.checkFiles(projectPath, [
-      "prisma/migrations"
-    ]);
-    if (migrationDirs.length > 0) {
-      evidence.push(`Found migrations directory: ${migrationDirs[0].relative}`);
-    }
-    const generatedFiles = await this.findFilesByPattern(
-      projectPath,
-      [/node_modules\/@prisma\/client/],
-      ["node_modules"]
-    );
-    if (generatedFiles.length > 0) {
-      evidence.push("Found generated Prisma client");
-    }
-    const confidence = this.calculateConfidence({
-      required: { found: foundDeps.length, total: 2 },
-      // prisma + @prisma/client
-      optional: { found: schemaFiles.length + migrationDirs.length, total: 2 },
-      negative: 0
-    });
-    if (foundDeps.length > 0 && schemaFiles.length === 0) {
-      warnings2.push("Prisma dependency found but no schema.prisma file detected");
-    }
-    if (schemaFiles.length > 0 && !foundDeps.includes("@prisma/client")) {
-      warnings2.push("Schema file found but @prisma/client not installed");
-    }
-    return {
-      found: confidence > 0.5,
-      confidence,
-      evidence,
-      warnings: warnings2.length > 0 ? warnings2 : void 0
-    };
-  }
-  /**
-   * Extract Prisma configuration
-   */
-  async extractConfig(projectPath) {
-    const { existing: schemaFiles } = await this.checkFiles(projectPath, [
-      "prisma/schema.prisma",
-      "schema.prisma"
-    ]);
-    if (schemaFiles.length === 0) {
-      return null;
-    }
-    const schemaFile = schemaFiles[0];
-    const migrationDirectory = await createFilePath("prisma/migrations", projectPath);
-    const schemaResult = await readFileContent(schemaFile.absolute);
-    if (!schemaResult.success) {
-      return null;
-    }
-    let clientGenerator;
-    const generatorMatch = schemaResult.data.match(/generator\s+client\s*{([^}]+)}/s);
-    if (generatorMatch) {
-      const generatorConfig = generatorMatch[1];
-      const providerMatch = generatorConfig.match(/provider\s*=\s*"([^"]+)"/);
-      const outputMatch = generatorConfig.match(/output\s*=\s*"([^"]+)"/);
-      clientGenerator = {
-        provider: providerMatch?.[1] || "prisma-client-js",
-        output: outputMatch?.[1]
-      };
-    }
-    return {
-      type: "prisma",
-      configFile: schemaFile,
-      migrationDirectory,
-      schemaFile,
-      dependencies: ["prisma", "@prisma/client"],
-      clientGenerator
-    };
-  }
-  /**
-   * Extract database configuration from Prisma schema
-   */
-  async getDatabaseConfig(projectPath) {
-    const config = await this.extractConfig(projectPath);
-    if (!config) {
-      return null;
-    }
-    const schemaResult = await readFileContent(config.schemaFile.absolute);
-    if (!schemaResult.success) {
-      return null;
-    }
-    const datasourceMatch = schemaResult.data.match(/datasource\s+\w+\s*{([^}]+)}/s);
-    if (!datasourceMatch) {
-      return null;
-    }
-    const datasourceConfig = datasourceMatch[1];
-    const providerMatch = datasourceConfig.match(/provider\s*=\s*"([^"]+)"/);
-    const provider = providerMatch?.[1];
-    const urlMatch = datasourceConfig.match(/url\s*=\s*env\("([^"]+)"\)/) || datasourceConfig.match(/url\s*=\s*"([^"]+)"/);
-    if (!urlMatch) {
-      return null;
-    }
-    let databaseUrl;
-    if (urlMatch[0].includes("env(")) {
-      const envVar = urlMatch[1];
-      databaseUrl = process.env[envVar] || "";
-      if (!databaseUrl) {
+var PrismaDetector;
+var init_prisma_detector = __esm({
+  "src/analyzer/orm-detectors/prisma-detector.ts"() {
+    "use strict";
+    init_base_detector();
+    init_core();
+    PrismaDetector = class extends BaseORMDetector {
+      name = "prisma";
+      /**
+       * Detect Prisma in the project
+       */
+      async detect(projectPath) {
+        const evidence = [];
+        const warnings = [];
+        const { found: foundDeps, missing: missingDeps } = await this.checkPackageJsonDependencies(
+          projectPath,
+          ["prisma", "@prisma/client"]
+        );
+        evidence.push(...foundDeps.map((dep) => `Found dependency: ${dep}`));
+        const { existing: schemaFiles } = await this.checkFiles(projectPath, [
+          "prisma/schema.prisma",
+          "schema.prisma"
+        ]);
+        if (schemaFiles.length > 0) {
+          evidence.push(`Found schema file: ${schemaFiles[0].relative}`);
+        }
+        const { existing: migrationDirs } = await this.checkFiles(projectPath, [
+          "prisma/migrations"
+        ]);
+        if (migrationDirs.length > 0) {
+          evidence.push(`Found migrations directory: ${migrationDirs[0].relative}`);
+        }
+        const generatedFiles = await this.findFilesByPattern(
+          projectPath,
+          [/node_modules\/@prisma\/client/],
+          ["node_modules"]
+        );
+        if (generatedFiles.length > 0) {
+          evidence.push("Found generated Prisma client");
+        }
+        const confidence = this.calculateConfidence({
+          required: { found: foundDeps.length, total: 2 },
+          // prisma + @prisma/client
+          optional: { found: schemaFiles.length + migrationDirs.length, total: 2 },
+          negative: 0
+        });
+        if (foundDeps.length > 0 && schemaFiles.length === 0) {
+          warnings.push("Prisma dependency found but no schema.prisma file detected");
+        }
+        if (schemaFiles.length > 0 && !foundDeps.includes("@prisma/client")) {
+          warnings.push("Schema file found but @prisma/client not installed");
+        }
+        return {
+          found: confidence > 0.5,
+          confidence,
+          evidence,
+          warnings: warnings.length > 0 ? warnings : void 0
+        };
+      }
+      /**
+       * Extract Prisma configuration
+       */
+      async extractConfig(projectPath) {
+        const { existing: schemaFiles } = await this.checkFiles(projectPath, [
+          "prisma/schema.prisma",
+          "schema.prisma"
+        ]);
+        if (schemaFiles.length === 0) {
+          return null;
+        }
+        const schemaFile = schemaFiles[0];
+        const migrationDirectory = await createFilePath("prisma/migrations", projectPath);
+        const schemaResult = await readFileContent(schemaFile.absolute);
+        if (!schemaResult.success) {
+          return null;
+        }
+        let clientGenerator;
+        const generatorMatch = schemaResult.data.match(/generator\s+client\s*{([^}]+)}/s);
+        if (generatorMatch) {
+          const generatorConfig = generatorMatch[1];
+          const providerMatch = generatorConfig.match(/provider\s*=\s*"([^"]+)"/);
+          const outputMatch = generatorConfig.match(/output\s*=\s*"([^"]+)"/);
+          clientGenerator = {
+            provider: providerMatch?.[1] || "prisma-client-js",
+            output: outputMatch?.[1]
+          };
+        }
+        return {
+          type: "prisma",
+          configFile: schemaFile,
+          migrationDirectory,
+          schemaFile,
+          dependencies: ["prisma", "@prisma/client"],
+          clientGenerator
+        };
+      }
+      /**
+       * Extract database configuration from Prisma schema
+       */
+      async getDatabaseConfig(projectPath) {
+        const config = await this.extractConfig(projectPath);
+        if (!config) {
+          return null;
+        }
+        const schemaResult = await readFileContent(config.schemaFile.absolute);
+        if (!schemaResult.success) {
+          return null;
+        }
+        const datasourceMatch = schemaResult.data.match(/datasource\s+\w+\s*{([^}]+)}/s);
+        if (!datasourceMatch) {
+          return null;
+        }
+        const datasourceConfig = datasourceMatch[1];
+        const providerMatch = datasourceConfig.match(/provider\s*=\s*"([^"]+)"/);
+        const provider = providerMatch?.[1];
+        const urlMatch = datasourceConfig.match(/url\s*=\s*env\("([^"]+)"\)/) || datasourceConfig.match(/url\s*=\s*"([^"]+)"/);
+        if (!urlMatch) {
+          return null;
+        }
+        let databaseUrl;
+        if (urlMatch[0].includes("env(")) {
+          const envVar = urlMatch[1];
+          databaseUrl = process.env[envVar] || "";
+          if (!databaseUrl) {
+            return {
+              type: this.mapPrismaProviderToType(provider),
+              database: "unknown"
+            };
+          }
+        } else {
+          databaseUrl = urlMatch[1];
+        }
+        const dbConfig = this.parseDatabaseUrl(databaseUrl);
+        if (dbConfig) {
+          return dbConfig;
+        }
         return {
           type: this.mapPrismaProviderToType(provider),
           database: "unknown"
         };
       }
-    } else {
-      databaseUrl = urlMatch[1];
-    }
-    const dbConfig = this.parseDatabaseUrl(databaseUrl);
-    if (dbConfig) {
-      return dbConfig;
-    }
-    return {
-      type: this.mapPrismaProviderToType(provider),
-      database: "unknown"
+      /**
+       * Map Prisma provider to database type
+       */
+      mapPrismaProviderToType(provider) {
+        switch (provider) {
+          case "postgresql":
+            return "postgresql";
+          case "mysql":
+            return "mysql";
+          case "sqlite":
+            return "sqlite";
+          default:
+            return "postgresql";
+        }
+      }
     };
   }
-  /**
-   * Map Prisma provider to database type
-   */
-  mapPrismaProviderToType(provider) {
-    switch (provider) {
-      case "postgresql":
-        return "postgresql";
-      case "mysql":
-        return "mysql";
-      case "sqlite":
-        return "sqlite";
-      default:
-        return "postgresql";
-    }
-  }
-};
+});
 
 // src/analyzer/orm-detectors/drizzle-detector.ts
-import path2 from "path";
-import fs3 from "fs-extra";
-var DrizzleDetector = class extends BaseORMDetector {
-  name = "drizzle";
-  async detect(projectPath) {
-    const evidence = [];
-    try {
-      const configFilesFound = await this.findConfigFilesRecursively(projectPath);
-      evidence.push(...configFilesFound.map((f) => `Found config file: ${f.relative}`));
-      let deps = await this.checkPackageJsonDependencies(projectPath, ["drizzle-orm", "drizzle-kit"]);
-      evidence.push(...deps.found.map((dep) => `Found dependency: ${dep} (root)`));
-      for (const configFile of configFilesFound) {
-        const configDir = path2.dirname(configFile.absolute);
-        const configDeps = await this.checkPackageJsonDependencies(configDir, ["drizzle-orm", "drizzle-kit"]);
-        evidence.push(...configDeps.found.map((dep) => `Found dependency: ${dep} (${configFile.relative})`));
-        deps.found = [.../* @__PURE__ */ new Set([...deps.found, ...configDeps.found])];
-      }
-      const schemaPatterns = [
-        "src/db/schema.ts",
-        "src/schema.ts",
-        "db/schema.ts",
-        "schema.ts",
-        "src/lib/db/schema.ts"
-      ];
-      const { existing: schemaFiles } = await this.checkFiles(projectPath, schemaPatterns);
-      evidence.push(...schemaFiles.map((f) => `Found schema file: ${f.relative}`));
-      const migrationDirs = ["drizzle", "migrations", "drizzle/migrations"];
-      const { existing: migrationDirsFound } = await this.checkFiles(projectPath, migrationDirs);
-      evidence.push(...migrationDirsFound.map((f) => `Found migration directory: ${f.relative}`));
-      const confidenceInput = {
-        required: {
-          found: deps.found.length > 0 ? 1 : 0,
-          total: 1
-        },
-        optional: {
-          found: (configFilesFound.length > 0 ? 1 : 0) + (schemaFiles.length > 0 ? 1 : 0) + (migrationDirsFound.length > 0 ? 1 : 0),
-          total: 3
-          // config files, schema files, migration dirs
-        },
-        negative: 0
-      };
-      const confidence = this.calculateConfidence(confidenceInput);
-      return {
-        found: confidence > 0.3,
-        confidence: Math.round(confidence * 100),
-        evidence
-      };
-    } catch (error) {
-      return {
-        found: false,
-        confidence: 0,
-        evidence: [`Error detecting Drizzle: ${error}`]
-      };
-    }
-  }
-  async extractConfig(projectPath) {
-    try {
-      const configFilesFound = await this.findConfigFilesRecursively(projectPath);
-      if (configFilesFound.length === 0) {
-        return null;
-      }
-      const configFile = configFilesFound[0];
-      const configContent = await fs3.readFile(configFile.absolute, "utf-8");
-      const driver = this.extractConfigValue(configContent, "dialect") || "pg";
-      const validDrivers = ["pg", "mysql2", "better-sqlite3", "sqlite"];
-      const mappedDriver = validDrivers.includes(driver) ? driver : "pg";
-      const outDir = this.extractConfigValue(configContent, "out") || "./drizzle";
-      const migrationDirAbsolute = path2.resolve(projectPath, outDir);
-      const config = {
-        type: "drizzle",
-        configFile,
-        driver: mappedDriver,
-        schemaPath: this.extractConfigValue(configContent, "schema") || "./src/db/schema.ts",
-        outDir,
-        migrationDirectory: {
-          absolute: migrationDirAbsolute,
-          relative: outDir,
-          exists: await fs3.pathExists(migrationDirAbsolute)
-        },
-        dependencies: ["drizzle-orm", "drizzle-kit"]
-      };
-      return config;
-    } catch (error) {
-      return null;
-    }
-  }
-  async getDatabaseConfig(projectPath) {
-    try {
-      const envFiles = [".env", ".env.local", ".env.development"];
-      const { existing: envFilesFound } = await this.checkFiles(projectPath, envFiles);
-      for (const envFile of envFilesFound) {
-        const envContent = await fs3.readFile(envFile.absolute, "utf-8");
-        const dbUrl = this.extractEnvValue(envContent, "DATABASE_URL");
-        if (dbUrl) {
-          const parsed = this.parseDatabaseUrl(dbUrl);
-          if (parsed) return parsed;
-        }
-      }
-      const drizzleConfig = await this.extractConfig(projectPath);
-      if (!drizzleConfig) return null;
-      const driverMap = {
-        "pg": "postgresql",
-        "mysql2": "mysql",
-        "better-sqlite3": "sqlite"
-      };
-      const dbType = driverMap[drizzleConfig.driver] || "postgresql";
-      return {
-        type: dbType,
-        host: "localhost",
-        port: dbType === "postgresql" ? 5432 : dbType === "mysql" ? 3306 : void 0,
-        database: "main"
-      };
-    } catch (error) {
-      return null;
-    }
-  }
-  extractConfigValue(content, key) {
-    const regex = new RegExp(`${key}:\\s*['"]([^'"]+)['"]`);
-    const match = content.match(regex);
-    return match?.[1];
-  }
-  extractEnvValue(content, key) {
-    const regex = new RegExp(`^${key}\\s*=\\s*(.+)$`, "m");
-    const match = content.match(regex);
-    return match?.[1]?.replace(/['"]/g, "").trim();
-  }
-  async findConfigFilesRecursively(projectPath) {
-    const configPatterns = /^drizzle\.config\.(ts|js|mjs)$/;
-    const foundFiles = [];
-    const searchDirectory = async (dir, currentPath = "") => {
-      try {
-        const items = await fs3.readdir(dir, { withFileTypes: true });
-        for (const item of items) {
-          const fullPath = path2.join(dir, item.name);
-          const relativePath = path2.join(currentPath, item.name);
-          if (item.isDirectory() && !["node_modules", ".git", ".next", "dist", "build"].includes(item.name)) {
-            await searchDirectory(fullPath, relativePath);
-          } else if (item.isFile() && configPatterns.test(item.name)) {
-            foundFiles.push({
-              absolute: fullPath,
-              relative: relativePath
-            });
+import path7 from "path";
+import fs8 from "fs-extra";
+var DrizzleDetector;
+var init_drizzle_detector = __esm({
+  "src/analyzer/orm-detectors/drizzle-detector.ts"() {
+    "use strict";
+    init_base_detector();
+    DrizzleDetector = class extends BaseORMDetector {
+      name = "drizzle";
+      async detect(projectPath) {
+        const evidence = [];
+        try {
+          const configFilesFound = await this.findConfigFilesRecursively(projectPath);
+          evidence.push(...configFilesFound.map((f) => `Found config file: ${f.relative}`));
+          let deps = await this.checkPackageJsonDependencies(projectPath, ["drizzle-orm", "drizzle-kit"]);
+          evidence.push(...deps.found.map((dep) => `Found dependency: ${dep} (root)`));
+          for (const configFile of configFilesFound) {
+            const configDir = path7.dirname(configFile.absolute);
+            const configDeps = await this.checkPackageJsonDependencies(configDir, ["drizzle-orm", "drizzle-kit"]);
+            evidence.push(...configDeps.found.map((dep) => `Found dependency: ${dep} (${configFile.relative})`));
+            deps.found = [.../* @__PURE__ */ new Set([...deps.found, ...configDeps.found])];
           }
+          const schemaPatterns = [
+            "src/db/schema.ts",
+            "src/schema.ts",
+            "db/schema.ts",
+            "schema.ts",
+            "src/lib/db/schema.ts"
+          ];
+          const { existing: schemaFiles } = await this.checkFiles(projectPath, schemaPatterns);
+          evidence.push(...schemaFiles.map((f) => `Found schema file: ${f.relative}`));
+          const migrationDirs = ["drizzle", "migrations", "drizzle/migrations"];
+          const { existing: migrationDirsFound } = await this.checkFiles(projectPath, migrationDirs);
+          evidence.push(...migrationDirsFound.map((f) => `Found migration directory: ${f.relative}`));
+          const confidenceInput = {
+            required: {
+              found: deps.found.length > 0 ? 1 : 0,
+              total: 1
+            },
+            optional: {
+              found: (configFilesFound.length > 0 ? 1 : 0) + (schemaFiles.length > 0 ? 1 : 0) + (migrationDirsFound.length > 0 ? 1 : 0),
+              total: 3
+              // config files, schema files, migration dirs
+            },
+            negative: 0
+          };
+          const confidence = this.calculateConfidence(confidenceInput);
+          return {
+            found: confidence > 0.3,
+            confidence: Math.round(confidence * 100),
+            evidence
+          };
+        } catch (error) {
+          return {
+            found: false,
+            confidence: 0,
+            evidence: [`Error detecting Drizzle: ${error}`]
+          };
         }
-      } catch {
+      }
+      async extractConfig(projectPath) {
+        try {
+          const configFilesFound = await this.findConfigFilesRecursively(projectPath);
+          if (configFilesFound.length === 0) {
+            return null;
+          }
+          const configFile = configFilesFound[0];
+          const configContent = await fs8.readFile(configFile.absolute, "utf-8");
+          const driver = this.extractConfigValue(configContent, "dialect") || "pg";
+          const validDrivers = ["pg", "mysql2", "better-sqlite3", "sqlite"];
+          const mappedDriver = validDrivers.includes(driver) ? driver : "pg";
+          const outDir = this.extractConfigValue(configContent, "out") || "./drizzle";
+          const migrationDirAbsolute = path7.resolve(projectPath, outDir);
+          const config = {
+            type: "drizzle",
+            configFile: {
+              absolute: configFile.absolute,
+              relative: configFile.relative,
+              exists: await fs8.pathExists(configFile.absolute)
+            },
+            driver: mappedDriver,
+            schemaPath: this.extractConfigValue(configContent, "schema") || "./src/db/schema.ts",
+            outDir,
+            migrationDirectory: {
+              absolute: migrationDirAbsolute,
+              relative: outDir,
+              exists: await fs8.pathExists(migrationDirAbsolute)
+            },
+            dependencies: ["drizzle-orm", "drizzle-kit"]
+          };
+          return config;
+        } catch (error) {
+          return null;
+        }
+      }
+      async getDatabaseConfig(projectPath) {
+        try {
+          const envFiles = [".env", ".env.local", ".env.development"];
+          const { existing: envFilesFound } = await this.checkFiles(projectPath, envFiles);
+          for (const envFile of envFilesFound) {
+            const envContent = await fs8.readFile(envFile.absolute, "utf-8");
+            const dbUrl = this.extractEnvValue(envContent, "DATABASE_URL");
+            if (dbUrl) {
+              const parsed = this.parseDatabaseUrl(dbUrl);
+              if (parsed) return parsed;
+            }
+          }
+          const drizzleConfig = await this.extractConfig(projectPath);
+          if (!drizzleConfig) return null;
+          const driverMap = {
+            "pg": "postgresql",
+            "mysql2": "mysql",
+            "better-sqlite3": "sqlite"
+          };
+          const dbType = driverMap[drizzleConfig.driver] || "postgresql";
+          return {
+            type: dbType,
+            host: "localhost",
+            port: dbType === "postgresql" ? 5432 : dbType === "mysql" ? 3306 : void 0,
+            database: "main"
+          };
+        } catch (error) {
+          return null;
+        }
+      }
+      extractConfigValue(content, key) {
+        const regex = new RegExp(`${key}:\\s*['"]([^'"]+)['"]`);
+        const match = content.match(regex);
+        return match?.[1];
+      }
+      extractEnvValue(content, key) {
+        const regex = new RegExp(`^${key}\\s*=\\s*(.+)$`, "m");
+        const match = content.match(regex);
+        return match?.[1]?.replace(/['"]/g, "").trim();
+      }
+      async findConfigFilesRecursively(projectPath) {
+        const configPatterns = /^drizzle\.config\.(ts|js|mjs)$/;
+        const foundFiles = [];
+        const searchDirectory = async (dir, currentPath = "") => {
+          try {
+            const items = await fs8.readdir(dir, { withFileTypes: true });
+            for (const item of items) {
+              const fullPath = path7.join(dir, item.name);
+              const relativePath = path7.join(currentPath, item.name);
+              if (item.isDirectory() && !["node_modules", ".git", ".next", "dist", "build"].includes(item.name)) {
+                await searchDirectory(fullPath, relativePath);
+              } else if (item.isFile() && configPatterns.test(item.name)) {
+                foundFiles.push({
+                  absolute: fullPath,
+                  relative: relativePath
+                });
+              }
+            }
+          } catch {
+          }
+        };
+        await searchDirectory(projectPath);
+        return foundFiles;
       }
     };
-    await searchDirectory(projectPath);
-    return foundFiles;
   }
-};
+});
 
 // src/analyzer/orm-detectors/typeorm-detector.ts
-import fs4 from "fs/promises";
-var TypeORMDetector = class extends BaseORMDetector {
-  name = "typeorm";
-  async detect(projectPath) {
-    const evidence = [];
-    try {
-      const configFiles = [
-        "ormconfig.ts",
-        "ormconfig.js",
-        "ormconfig.json",
-        "typeorm.config.ts",
-        "typeorm.config.js",
-        "src/data-source.ts",
-        "src/data-source.js"
-      ];
-      const { existing: configFilesFound } = await this.checkFiles(projectPath, configFiles);
-      evidence.push(...configFilesFound.map((f) => `Found config file: ${f.relative}`));
-      const deps = await this.checkPackageJsonDependencies(projectPath, ["typeorm", "@nestjs/typeorm"]);
-      evidence.push(...deps.found.map((dep) => `Found dependency: ${dep}`));
-      const entityPatterns = await this.findFilesByPattern(
-        projectPath,
-        [/\.entity\.(ts|js)$/, /@Entity\(/],
-        ["src", "entities", "entity"]
-      );
-      if (entityPatterns.length > 0) {
-        evidence.push(`Found ${entityPatterns.length} entity files`);
-      }
-      const migrationDirs = ["src/migrations", "migrations", "database/migrations"];
-      const { existing: migrationDirsFound } = await this.checkFiles(projectPath, migrationDirs);
-      evidence.push(...migrationDirsFound.map((f) => `Found migration directory: ${f.relative}`));
-      const migrationPatterns = await this.findFilesByPattern(
-        projectPath,
-        [/\d+.*\.(ts|js)$/],
-        ["src/migrations", "migrations", "database/migrations"]
-      );
-      if (migrationPatterns.length > 0) {
-        evidence.push(`Found ${migrationPatterns.length} migration files`);
-      }
-      const confidence = this.calculateConfidence({
-        required: {
-          found: deps.found.length > 0 ? 1 : 0,
-          total: 1
-        },
-        optional: {
-          found: configFilesFound.length + (entityPatterns.length > 0 ? 1 : 0) + migrationDirsFound.length + (migrationPatterns.length > 0 ? 1 : 0),
-          total: 4
-        },
-        negative: 0
-      });
-      return {
-        found: confidence > 0.3,
-        confidence: Math.round(confidence * 100),
-        evidence
-      };
-    } catch (error) {
-      return {
-        found: false,
-        confidence: 0,
-        evidence: [`Error detecting TypeORM: ${error}`]
-      };
-    }
-  }
-  async extractConfig(projectPath) {
-    try {
-      const configFiles = [
-        "ormconfig.ts",
-        "ormconfig.js",
-        "ormconfig.json",
-        "typeorm.config.ts",
-        "typeorm.config.js",
-        "src/data-source.ts",
-        "src/data-source.js"
-      ];
-      const { existing: configFilesFound } = await this.checkFiles(projectPath, configFiles);
-      if (configFilesFound.length === 0) {
-        return null;
-      }
-      const configFile = configFilesFound[0];
-      let entities = [];
-      let migrations = [];
-      if (configFile.relative.endsWith(".json")) {
-        const configContent = await fs4.readFile(configFile.absolute, "utf-8");
-        const jsonConfig = JSON.parse(configContent);
-        entities = Array.isArray(jsonConfig.entities) ? jsonConfig.entities : ["src/**/*.entity.{ts,js}"];
-        migrations = Array.isArray(jsonConfig.migrations) ? jsonConfig.migrations : ["src/migrations/*.{ts,js}"];
-      } else {
-        const configContent = await fs4.readFile(configFile.absolute, "utf-8");
-        entities = this.extractArrayValue(configContent, "entities") || ["src/**/*.entity.{ts,js}"];
-        migrations = this.extractArrayValue(configContent, "migrations") || ["src/migrations/*.{ts,js}"];
-      }
-      const config = {
-        type: "typeorm",
-        configFile,
-        entities,
-        migrations,
-        migrationDirectory: configFile,
-        // Will be updated with proper migration directory  
-        dependencies: ["typeorm"],
-        cli: {
-          migrationsDir: "src/migrations",
-          entitiesDir: "src/entities"
-        }
-      };
-      return config;
-    } catch (error) {
-      console.warn(`Failed to extract TypeORM config: ${error}`);
-      return null;
-    }
-  }
-  async getDatabaseConfig(projectPath) {
-    try {
-      const envFiles = [".env", ".env.local", ".env.development"];
-      const { existing: envFilesFound } = await this.checkFiles(projectPath, envFiles);
-      for (const envFile of envFilesFound) {
-        const envContent = await fs4.readFile(envFile.absolute, "utf-8");
-        const dbUrl = this.extractEnvValue(envContent, "DATABASE_URL") || this.extractEnvValue(envContent, "DB_URL") || this.extractEnvValue(envContent, "TYPEORM_URL");
-        if (dbUrl) {
-          const parsed = this.parseDatabaseUrl(dbUrl);
-          if (parsed) return parsed;
-        }
-      }
-      const typeormConfig = await this.extractConfig(projectPath);
-      if (typeormConfig?.configFile) {
-        const configContent = await fs4.readFile(typeormConfig.configFile.absolute, "utf-8");
-        const type = this.extractConfigValue(configContent, "type");
-        const host = this.extractConfigValue(configContent, "host");
-        const port = this.extractConfigValue(configContent, "port");
-        const database = this.extractConfigValue(configContent, "database");
-        const username = this.extractConfigValue(configContent, "username");
-        const password = this.extractConfigValue(configContent, "password");
-        if (type && database) {
-          const dbTypeMap = {
-            "postgres": "postgresql",
-            "postgresql": "postgresql",
-            "mysql": "mysql",
-            "mariadb": "mysql",
-            "sqlite": "sqlite"
-          };
-          const mappedType = dbTypeMap[type] || "postgresql";
+import fs9 from "fs/promises";
+var TypeORMDetector;
+var init_typeorm_detector = __esm({
+  "src/analyzer/orm-detectors/typeorm-detector.ts"() {
+    "use strict";
+    init_base_detector();
+    TypeORMDetector = class extends BaseORMDetector {
+      name = "typeorm";
+      async detect(projectPath) {
+        const evidence = [];
+        try {
+          const configFiles = [
+            "ormconfig.ts",
+            "ormconfig.js",
+            "ormconfig.json",
+            "typeorm.config.ts",
+            "typeorm.config.js",
+            "src/data-source.ts",
+            "src/data-source.js"
+          ];
+          const { existing: configFilesFound } = await this.checkFiles(projectPath, configFiles);
+          evidence.push(...configFilesFound.map((f) => `Found config file: ${f.relative}`));
+          const deps = await this.checkPackageJsonDependencies(projectPath, ["typeorm", "@nestjs/typeorm"]);
+          evidence.push(...deps.found.map((dep) => `Found dependency: ${dep}`));
+          const entityPatterns = await this.findFilesByPattern(
+            projectPath,
+            [/\.entity\.(ts|js)$/, /@Entity\(/],
+            ["src", "entities", "entity"]
+          );
+          if (entityPatterns.length > 0) {
+            evidence.push(`Found ${entityPatterns.length} entity files`);
+          }
+          const migrationDirs = ["src/migrations", "migrations", "database/migrations"];
+          const { existing: migrationDirsFound } = await this.checkFiles(projectPath, migrationDirs);
+          evidence.push(...migrationDirsFound.map((f) => `Found migration directory: ${f.relative}`));
+          const migrationPatterns = await this.findFilesByPattern(
+            projectPath,
+            [/\d+.*\.(ts|js)$/],
+            ["src/migrations", "migrations", "database/migrations"]
+          );
+          if (migrationPatterns.length > 0) {
+            evidence.push(`Found ${migrationPatterns.length} migration files`);
+          }
+          const confidence = this.calculateConfidence({
+            required: {
+              found: deps.found.length > 0 ? 1 : 0,
+              total: 1
+            },
+            optional: {
+              found: configFilesFound.length + (entityPatterns.length > 0 ? 1 : 0) + migrationDirsFound.length + (migrationPatterns.length > 0 ? 1 : 0),
+              total: 4
+            },
+            negative: 0
+          });
           return {
-            type: mappedType,
-            host: host || "localhost",
-            port: port ? parseInt(port) : mappedType === "postgresql" ? 5432 : mappedType === "mysql" ? 3306 : void 0,
-            database,
-            username,
-            password
+            found: confidence > 0.3,
+            confidence: Math.round(confidence * 100),
+            evidence
+          };
+        } catch (error) {
+          return {
+            found: false,
+            confidence: 0,
+            evidence: [`Error detecting TypeORM: ${error}`]
           };
         }
       }
-      return {
-        type: "postgresql",
-        host: "localhost",
-        port: 5432,
-        database: "main"
-      };
-    } catch (error) {
-      console.warn(`Failed to extract database config: ${error}`);
-      return null;
-    }
+      async extractConfig(projectPath) {
+        try {
+          const configFiles = [
+            "ormconfig.ts",
+            "ormconfig.js",
+            "ormconfig.json",
+            "typeorm.config.ts",
+            "typeorm.config.js",
+            "src/data-source.ts",
+            "src/data-source.js"
+          ];
+          const { existing: configFilesFound } = await this.checkFiles(projectPath, configFiles);
+          if (configFilesFound.length === 0) {
+            return null;
+          }
+          const configFile = configFilesFound[0];
+          let entities = [];
+          let migrations = [];
+          if (configFile.relative.endsWith(".json")) {
+            const configContent = await fs9.readFile(configFile.absolute, "utf-8");
+            const jsonConfig = JSON.parse(configContent);
+            entities = Array.isArray(jsonConfig.entities) ? jsonConfig.entities : ["src/**/*.entity.{ts,js}"];
+            migrations = Array.isArray(jsonConfig.migrations) ? jsonConfig.migrations : ["src/migrations/*.{ts,js}"];
+          } else {
+            const configContent = await fs9.readFile(configFile.absolute, "utf-8");
+            entities = this.extractArrayValue(configContent, "entities") || ["src/**/*.entity.{ts,js}"];
+            migrations = this.extractArrayValue(configContent, "migrations") || ["src/migrations/*.{ts,js}"];
+          }
+          const config = {
+            type: "typeorm",
+            configFile,
+            entities,
+            migrations,
+            migrationDirectory: configFile,
+            // Will be updated with proper migration directory  
+            dependencies: ["typeorm"],
+            cli: {
+              migrationsDir: "src/migrations",
+              entitiesDir: "src/entities"
+            }
+          };
+          return config;
+        } catch (error) {
+          console.warn(`Failed to extract TypeORM config: ${error}`);
+          return null;
+        }
+      }
+      async getDatabaseConfig(projectPath) {
+        try {
+          const envFiles = [".env", ".env.local", ".env.development"];
+          const { existing: envFilesFound } = await this.checkFiles(projectPath, envFiles);
+          for (const envFile of envFilesFound) {
+            const envContent = await fs9.readFile(envFile.absolute, "utf-8");
+            const dbUrl = this.extractEnvValue(envContent, "DATABASE_URL") || this.extractEnvValue(envContent, "DB_URL") || this.extractEnvValue(envContent, "TYPEORM_URL");
+            if (dbUrl) {
+              const parsed = this.parseDatabaseUrl(dbUrl);
+              if (parsed) return parsed;
+            }
+          }
+          const typeormConfig = await this.extractConfig(projectPath);
+          if (typeormConfig?.configFile) {
+            const configContent = await fs9.readFile(typeormConfig.configFile.absolute, "utf-8");
+            const type = this.extractConfigValue(configContent, "type");
+            const host = this.extractConfigValue(configContent, "host");
+            const port = this.extractConfigValue(configContent, "port");
+            const database = this.extractConfigValue(configContent, "database");
+            const username = this.extractConfigValue(configContent, "username");
+            const password = this.extractConfigValue(configContent, "password");
+            if (type && database) {
+              const dbTypeMap = {
+                "postgres": "postgresql",
+                "postgresql": "postgresql",
+                "mysql": "mysql",
+                "mariadb": "mysql",
+                "sqlite": "sqlite"
+              };
+              const mappedType = dbTypeMap[type] || "postgresql";
+              return {
+                type: mappedType,
+                host: host || "localhost",
+                port: port ? parseInt(port) : mappedType === "postgresql" ? 5432 : mappedType === "mysql" ? 3306 : void 0,
+                database,
+                username,
+                password
+              };
+            }
+          }
+          return {
+            type: "postgresql",
+            host: "localhost",
+            port: 5432,
+            database: "main"
+          };
+        } catch (error) {
+          console.warn(`Failed to extract database config: ${error}`);
+          return null;
+        }
+      }
+      extractConfigValue(content, key) {
+        const regex = new RegExp(`${key}:\\s*['"]([^'"]+)['"]`);
+        const match = content.match(regex);
+        return match?.[1];
+      }
+      extractArrayValue(content, key) {
+        const regex = new RegExp(`${key}:\\s*\\[([^\\]]+)\\]`);
+        const match = content.match(regex);
+        if (!match) return void 0;
+        return match[1].split(",").map((item) => item.trim().replace(/['"]/g, "")).filter((item) => item.length > 0);
+      }
+      extractEnvValue(content, key) {
+        const regex = new RegExp(`^${key}\\s*=\\s*(.+)$`, "m");
+        const match = content.match(regex);
+        return match?.[1]?.replace(/['"]/g, "").trim();
+      }
+    };
   }
-  extractConfigValue(content, key) {
-    const regex = new RegExp(`${key}:\\s*['"]([^'"]+)['"]`);
-    const match = content.match(regex);
-    return match?.[1];
+});
+
+// src/analyzer/orm-detectors/index.ts
+var init_orm_detectors = __esm({
+  "src/analyzer/orm-detectors/index.ts"() {
+    "use strict";
+    init_prisma_detector();
+    init_drizzle_detector();
+    init_typeorm_detector();
+    init_base_detector();
   }
-  extractArrayValue(content, key) {
-    const regex = new RegExp(`${key}:\\s*\\[([^\\]]+)\\]`);
-    const match = content.match(regex);
-    if (!match) return void 0;
-    return match[1].split(",").map((item) => item.trim().replace(/['"]/g, "")).filter((item) => item.length > 0);
+});
+
+// src/analyzer/database/connection.ts
+var init_connection = __esm({
+  "src/analyzer/database/connection.ts"() {
+    "use strict";
   }
-  extractEnvValue(content, key) {
-    const regex = new RegExp(`^${key}\\s*=\\s*(.+)$`, "m");
-    const match = content.match(regex);
-    return match?.[1]?.replace(/['"]/g, "").trim();
+});
+
+// src/analyzer/database/analysis.ts
+var init_analysis = __esm({
+  "src/analyzer/database/analysis.ts"() {
+    "use strict";
   }
-};
+});
+
+// src/analyzer/database/adapters.ts
+var init_adapters = __esm({
+  "src/analyzer/database/adapters.ts"() {
+    "use strict";
+  }
+});
+
+// src/analyzer/database/index.ts
+var init_database2 = __esm({
+  "src/analyzer/database/index.ts"() {
+    "use strict";
+    init_connection();
+    init_analysis();
+    init_adapters();
+  }
+});
+
+// src/analyzer/index.ts
+var init_analyzer = __esm({
+  "src/analyzer/index.ts"() {
+    "use strict";
+    init_orm_detectors();
+    init_database2();
+  }
+});
 
 // src/commands/init.ts
+var init_exports = {};
+__export(init_exports, {
+  initCommand: () => initCommand
+});
+import fsExtra2 from "fs-extra";
+import { resolve as resolve3 } from "path";
+import dotenv from "dotenv";
 async function findDatabaseUrl(envName, projectPath) {
   const candidateFiles = [];
-  candidateFiles.push(resolve2(projectPath, ".env"));
+  candidateFiles.push(resolve3(projectPath, ".env"));
   const parts = projectPath.split("/");
   for (let i = parts.length - 1; i > 0; i--) {
     candidateFiles.push(parts.slice(0, i + 1).join("/") + "/.env");
   }
-  const appsDir = resolve2(projectPath, "apps");
-  const pkgsDir = resolve2(projectPath, "packages");
-  if (await fsExtra.pathExists(appsDir)) {
-    const sub = await fsExtra.readdir(appsDir);
-    sub.forEach((s) => candidateFiles.push(resolve2(appsDir, s, ".env")));
+  const appsDir = resolve3(projectPath, "apps");
+  const pkgsDir = resolve3(projectPath, "packages");
+  if (await fsExtra2.pathExists(appsDir)) {
+    const sub = await fsExtra2.readdir(appsDir);
+    sub.forEach((s) => candidateFiles.push(resolve3(appsDir, s, ".env")));
   }
-  if (await fsExtra.pathExists(pkgsDir)) {
-    const sub = await fsExtra.readdir(pkgsDir);
-    sub.forEach((s) => candidateFiles.push(resolve2(pkgsDir, s, ".env")));
+  if (await fsExtra2.pathExists(pkgsDir)) {
+    const sub = await fsExtra2.readdir(pkgsDir);
+    sub.forEach((s) => candidateFiles.push(resolve3(pkgsDir, s, ".env")));
   }
   for (const file of candidateFiles) {
-    if (await fsExtra.pathExists(file)) {
+    if (await fsExtra2.pathExists(file)) {
       try {
-        const envVars = dotenv.parse(await fsExtra.readFile(file));
+        const envVars = dotenv.parse(await fsExtra2.readFile(file));
         const v = envVars.DATABASE_URL || envVars[`DATABASE_URL_${envName.toUpperCase()}`];
         if (v) return v;
       } catch {
@@ -737,8 +3350,8 @@ async function detectMigrationsDir(projectPath) {
   ];
   const drizzleConfigFiles = ["drizzle.config.ts", "drizzle.config.js", "drizzle.config.mjs", "drizzle.config.cjs"];
   for (const f of drizzleConfigFiles) {
-    if (await fsExtra.pathExists(resolve2(projectPath, f))) {
-      const content = await fsExtra.readFile(resolve2(projectPath, f), "utf8");
+    if (await fsExtra2.pathExists(resolve3(projectPath, f))) {
+      const content = await fsExtra2.readFile(resolve3(projectPath, f), "utf8");
       const match = content.match(/out\s*:\s*["'`](.+?)["'`]/);
       if (match) {
         candidates.unshift(match[1]);
@@ -746,20 +3359,20 @@ async function detectMigrationsDir(projectPath) {
     }
   }
   for (const rel of candidates) {
-    if (await fsExtra.pathExists(resolve2(projectPath, rel))) return rel;
+    if (await fsExtra2.pathExists(resolve3(projectPath, rel))) return rel;
   }
   return null;
 }
 async function initCommand(options, globalOptions) {
-  const projectPath = resolve2(options.project || process.cwd());
-  const spinner3 = createSpinner("Collecting project information");
+  const projectPath = resolve3(options.project || process.cwd());
+  const spinner2 = createFlowSpinner().start("Collecting project information");
   let envName, databaseUrl, migrationsPath;
   if (options.yes) {
     envName = options.envName || "development";
     const detectedDb = await findDatabaseUrl(envName, projectPath);
     databaseUrl = options.dbUrl || detectedDb;
     if (!databaseUrl) {
-      spinner3.fail("Database connection string is required. Please provide it with --db-url.");
+      spinner2.fail("Database connection string is required. Please provide it with --db-url.");
       throw new Error("FLOW_MISSING_DB_NON_INTERACTIVE");
     }
     const detectedPath = await detectMigrationsDir(projectPath);
@@ -778,7 +3391,7 @@ async function initCommand(options, globalOptions) {
     });
     databaseUrl = (dbInput?.trim() || defaultDb).trim();
     if (!databaseUrl) {
-      spinner3.fail("Database connection string is required");
+      spinner2.fail("Database connection string is required");
       throw new Error("FLOW_MISSING_DB");
     }
     const detectedPath = await detectMigrationsDir(projectPath) || "./migrations";
@@ -789,11 +3402,11 @@ async function initCommand(options, globalOptions) {
     migrationsPath = migInput?.trim() || detectedPath;
     const proceed = await confirmAction("Generate configuration with these values?");
     if (!proceed) {
-      spinner3.fail("User cancelled");
+      spinner2.fail("User cancelled");
       return;
     }
   }
-  spinner3.update("Generating flow.config");
+  spinner2.update("Generating flow.config");
   const detectors = [
     { name: "prisma", detector: new PrismaDetector() },
     { name: "drizzle", detector: new DrizzleDetector() },
@@ -822,3351 +3435,240 @@ async function initCommand(options, globalOptions) {
       maxLockTimeMs: 3e5
     }
   };
-  const configPath = resolve2(projectPath, globalOptions.config || "flow.config.json");
-  if (await fsExtra.pathExists(configPath) && !options.yes && !await confirmAction(`Overwrite existing ${configPath}?`)) {
-    spinner3.fail("Init aborted \u2013 config exists");
+  const configPath = resolve3(projectPath, globalOptions.config || "flow.config.json");
+  if (await fsExtra2.pathExists(configPath) && !options.yes && !await confirmAction(`Overwrite existing ${configPath}?`)) {
+    spinner2.fail("Init aborted \u2013 config exists");
     return;
   }
   if (!globalOptions.dryRun) {
-    await fsExtra.writeFile(configPath, JSON.stringify(config, null, 2));
-    spinner3.succeed(`Configuration written to ${configPath}`);
+    await fsExtra2.writeFile(configPath, JSON.stringify(config, null, 2));
+    spinner2.succeed(`Configuration written to ${configPath}`);
   } else {
-    spinner3.succeed("Dry run complete \u2013 configuration would be:");
+    spinner2.succeed("Dry run complete \u2013 configuration would be:");
     console.log(JSON.stringify(config, null, 2));
   }
   try {
-    const pkgPath = resolve2(projectPath, "package.json");
-    if (await fsExtra.pathExists(pkgPath)) {
+    const pkgPath = resolve3(projectPath, "package.json");
+    if (await fsExtra2.pathExists(pkgPath)) {
       const fsmod = await import("fs-extra");
       const fsDyn = fsmod.default ?? fsmod;
-      const pkg2 = await fsDyn.readJson(pkgPath);
-      pkg2.scripts = pkg2.scripts || {};
-      if (!pkg2.scripts.flow) {
-        pkg2.scripts.flow = "flow";
-        await fsDyn.writeJson(pkgPath, pkg2, { spaces: 2 });
-        spinner3.update('Added "flow" script to package.json');
+      const pkg3 = await fsDyn.readJson(pkgPath);
+      pkg3.scripts = pkg3.scripts || {};
+      if (!pkg3.scripts.flow) {
+        pkg3.scripts.flow = "flow";
+        await fsDyn.writeJson(pkgPath, pkg3, { spaces: 2 });
+        spinner2.update('Added "flow" script to package.json');
       }
     }
   } catch (err) {
     console.warn("\u26A0\uFE0F  Could not update package.json:", err instanceof Error ? err.message : err);
   }
 }
+var init_init = __esm({
+  "src/commands/init.ts"() {
+    "use strict";
+    init_prompts();
+    init_analyzer();
+  }
+});
 
-// src/commands/sync.ts
-import { confirm as confirm2 } from "@clack/prompts";
-
-// src/lib/config.ts
-import fsExtra2 from "fs-extra";
-import { resolve as resolve3, dirname as dirname2 } from "path";
-async function getFlowConfig(global, projectPath) {
-  const configPath = await findConfigFile(projectPath || process.cwd(), global.config);
-  return JSON.parse(await fsExtra2.readFile(configPath, "utf8"));
+// src/commands/config.ts
+var config_exports = {};
+__export(config_exports, {
+  configCommand: () => configCommand
+});
+import { intro as intro4, outro as outro4 } from "@clack/prompts";
+import pc5 from "picocolors";
+async function configCommand(options, globalOptions) {
+  intro4("\u2699\uFE0F Flow Configuration");
+  const projectPath = options.project ? __require("path").resolve(options.project) : process.cwd();
+  const cfg = await getFlowConfig(globalOptions, projectPath);
+  console.log(pc5.bold("Current Configuration:"));
+  console.log(JSON.stringify(cfg, null, 2));
+  outro4("\u2699\uFE0F Configuration check complete.");
 }
-async function findConfigFile(startDir, explicit) {
-  if (explicit) {
-    const p = resolve3(explicit);
-    if (await fsExtra2.pathExists(p)) return p;
-    throw new Error(`Config file not found at ${p}`);
+var init_config4 = __esm({
+  "src/commands/config.ts"() {
+    "use strict";
+    init_config();
   }
-  let dir = startDir;
-  while (true) {
-    const candidate = resolve3(dir, "flow.config.json");
-    if (await fsExtra2.pathExists(candidate)) return candidate;
-    const parent = dirname2(dir);
-    if (parent === dir) break;
-    dir = parent;
-  }
-  throw new Error("flow.config.json not found");
-}
+});
 
-// src/enhancer/parsers/sql-parser.ts
-import pkg from "node-sql-parser";
-var { Parser } = pkg;
-
-// src/enhancer/parsers/migration-parser.ts
-import * as fs5 from "fs/promises";
-import * as path3 from "path";
-
-// src/enhancer/risk-detector.ts
-var SQLRiskDetector = class {
-  constructor(dbConnection) {
-    this.dbConnection = dbConnection;
-  }
-  /**
-   * Ultra-fast SQL risk analysis using pattern matching and caching
-   */
-  async analyzeSQL(sql, tableMetadata) {
-    const sqlLower = sql.toLowerCase();
-    const riskCategories = [];
-    const mitigationStrategies = [];
-    const warnings2 = [];
-    const blockers = [];
-    const riskPatterns = this.getUltraFastRiskPatterns();
-    for (const pattern of riskPatterns) {
-      if (pattern.regex.test(sqlLower)) {
-        riskCategories.push(pattern.risk);
-        mitigationStrategies.push(...pattern.mitigations);
-        if (pattern.isBlocker) blockers.push(pattern.risk.description);
-        if (pattern.isWarning) warnings2.push(pattern.risk.description);
-      }
-    }
-    const riskScore = this.calculateRiskScore(riskCategories);
-    const riskLevel = this.determineRiskLevel(riskScore);
-    return {
-      riskLevel,
-      riskScore,
-      riskCategories,
-      mitigationStrategies: [...new Set(mitigationStrategies)],
-      warnings: [...new Set(warnings2)],
-      blockers: [...new Set(blockers)]
-    };
-  }
-  /**
-   * Ultra-fast risk pattern matching for instant analysis
-   */
-  getUltraFastRiskPatterns() {
-    return [
-      {
-        regex: /alter\s+table.*add\s+column.*not\s+null(?!.*default)/i,
-        risk: {
-          type: "BLOCKING",
-          severity: "HIGH",
-          description: "Adding NOT NULL column without default causes table rewrite",
-          affectedObjects: [],
-          estimatedImpact: { lockDuration: 300, downtime: 300, rollbackDifficulty: "MEDIUM" }
-        },
-        mitigations: ["Add column as nullable first", "Populate with default values", "Add NOT NULL constraint separately"],
-        isBlocker: true,
-        isWarning: true
-      },
-      {
-        regex: /drop\s+(table|column)/i,
-        risk: {
-          type: "DESTRUCTIVE",
-          severity: "CRITICAL",
-          description: "Destructive operation may cause permanent data loss",
-          affectedObjects: [],
-          estimatedImpact: { dataLoss: true, rollbackDifficulty: "IMPOSSIBLE" }
-        },
-        mitigations: ["Create data backup before executing", "Use soft delete patterns", "Archive data instead of dropping"],
-        isBlocker: true,
-        isWarning: true
-      },
-      {
-        regex: /create\s+index(?!\s+concurrently)/i,
-        risk: {
-          type: "BLOCKING",
-          severity: "MEDIUM",
-          description: "Index creation without CONCURRENTLY causes table lock",
-          affectedObjects: [],
-          estimatedImpact: { lockDuration: 120, downtime: 120, rollbackDifficulty: "EASY" }
-        },
-        mitigations: ["Use CREATE INDEX CONCURRENTLY", "Run during maintenance window"],
-        isBlocker: false,
-        isWarning: true
-      },
-      {
-        regex: /alter\s+table.*add\s+constraint/i,
-        risk: {
-          type: "PERFORMANCE",
-          severity: "MEDIUM",
-          description: "Adding constraints can cause table scan and lock",
-          affectedObjects: [],
-          estimatedImpact: { lockDuration: 60, rollbackDifficulty: "EASY" }
-        },
-        mitigations: ["Add constraint with NOT VALID first", "Validate constraint separately"],
-        isBlocker: false,
-        isWarning: true
-      }
-    ];
-  }
-  calculateRiskScore(categories) {
-    let score = 0;
-    for (const category of categories) {
-      switch (category.severity) {
-        case "LOW":
-          score += 10;
-          break;
-        case "MEDIUM":
-          score += 25;
-          break;
-        case "HIGH":
-          score += 50;
-          break;
-        case "CRITICAL":
-          score += 100;
-          break;
-      }
-    }
-    return Math.min(score, 100);
-  }
-  determineRiskLevel(score) {
-    if (score >= 80) return "CRITICAL";
-    if (score >= 50) return "HIGH";
-    if (score >= 25) return "MEDIUM";
-    return "LOW";
-  }
-  /**
-   * Parse SQL into individual statements
-   */
-  parseStatements(sql) {
-    return sql.split(";").map((stmt) => stmt.trim()).filter((stmt) => stmt.length > 0);
-  }
-  /**
-   * Analyze a single SQL statement for risks
-   */
-  async analyzeStatement(statement, tableMetadata) {
-    const categories = [];
-    const mitigations = [];
-    const warnings2 = [];
-    const blockers = [];
-    const statementLower = statement.toLowerCase().trim();
-    const blockingRisks = this.detectBlockingOperations(statementLower, statement);
-    categories.push(...blockingRisks.categories);
-    mitigations.push(...blockingRisks.mitigations);
-    warnings2.push(...blockingRisks.warnings);
-    const destructiveRisks = this.detectDestructiveOperations(statementLower, statement);
-    categories.push(...destructiveRisks.categories);
-    mitigations.push(...destructiveRisks.mitigations);
-    warnings2.push(...destructiveRisks.warnings);
-    const performanceRisks = await this.detectPerformanceImpacts(statementLower, statement, tableMetadata);
-    categories.push(...performanceRisks.categories);
-    mitigations.push(...performanceRisks.mitigations);
-    warnings2.push(...performanceRisks.warnings);
-    const constraintRisks = this.detectConstraintViolations(statementLower, statement);
-    categories.push(...constraintRisks.categories);
-    mitigations.push(...constraintRisks.mitigations);
-    warnings2.push(...constraintRisks.warnings);
-    const downtimeRisks = await this.detectDowntimeOperations(statementLower, statement, tableMetadata);
-    categories.push(...downtimeRisks.categories);
-    mitigations.push(...downtimeRisks.mitigations);
-    blockers.push(...downtimeRisks.blockers);
-    return { categories, mitigations, warnings: warnings2, blockers };
-  }
-  /**
-   * Detect operations that cause table locks or block other operations
-   */
-  detectBlockingOperations(statementLower, originalStatement) {
-    const categories = [];
-    const mitigations = [];
-    const warnings2 = [];
-    if (statementLower.includes("alter table")) {
-      const tableName = this.extractTableName(statementLower, "alter table");
-      if (statementLower.includes("add column") && statementLower.includes("not null") && !statementLower.includes("default")) {
-        categories.push({
-          type: "BLOCKING",
-          severity: "HIGH",
-          description: "Adding NOT NULL column without default requires table rewrite and exclusive lock",
-          affectedObjects: [tableName || "unknown_table"],
-          estimatedImpact: {
-            lockDuration: 300,
-            // 5 minutes estimated
-            rollbackDifficulty: "MEDIUM"
-          }
-        });
-        mitigations.push("Add column as nullable first, then populate and add NOT NULL constraint");
-        mitigations.push("Add column with DEFAULT value to avoid table rewrite");
-      }
-      if (statementLower.includes("drop column")) {
-        categories.push({
-          type: "BLOCKING",
-          severity: "MEDIUM",
-          description: "Dropping column requires exclusive table lock",
-          affectedObjects: [tableName || "unknown_table"],
-          estimatedImpact: {
-            lockDuration: 60,
-            // 1 minute estimated
-            rollbackDifficulty: "HARD"
-          }
-        });
-        mitigations.push("Consider renaming column first for gradual removal");
-      }
-      if (statementLower.includes("add constraint") && statementLower.includes("foreign key")) {
-        categories.push({
-          type: "BLOCKING",
-          severity: "HIGH",
-          description: "Adding foreign key constraint requires exclusive locks on both tables",
-          affectedObjects: [tableName || "unknown_table"],
-          estimatedImpact: {
-            lockDuration: 180,
-            // 3 minutes estimated
-            rollbackDifficulty: "MEDIUM"
-          }
-        });
-        mitigations.push("Add constraint as NOT ENFORCED first, then validate separately");
-        warnings2.push("Ensure referential integrity before adding constraint");
-      }
-      if (statementLower.includes("add constraint") && statementLower.includes("unique")) {
-        categories.push({
-          type: "BLOCKING",
-          severity: "MEDIUM",
-          description: "Adding unique constraint requires table scan and exclusive lock",
-          affectedObjects: [tableName || "unknown_table"],
-          estimatedImpact: {
-            lockDuration: 120,
-            // 2 minutes estimated
-            rollbackDifficulty: "EASY"
-          }
-        });
-        mitigations.push("Check for duplicate data before adding constraint");
-        warnings2.push("Unique constraint will fail if duplicate data exists");
-      }
-    }
-    if (statementLower.includes("create index") && !statementLower.includes("concurrently")) {
-      const tableName = this.extractTableName(statementLower, "on");
-      categories.push({
-        type: "BLOCKING",
-        severity: "MEDIUM",
-        description: "Creating index without CONCURRENTLY blocks table writes",
-        affectedObjects: [tableName || "unknown_table"],
-        estimatedImpact: {
-          lockDuration: 120,
-          // 2 minutes estimated
-          rollbackDifficulty: "EASY"
-        }
-      });
-      if (this.dbConnection?.type === "postgresql") {
-        mitigations.push("Use CREATE INDEX CONCURRENTLY to avoid blocking writes");
-      }
-      warnings2.push("Index creation time depends on table size");
-    }
-    return { categories, mitigations, warnings: warnings2 };
-  }
-  /**
-   * Detect operations that can cause data loss
-   */
-  detectDestructiveOperations(statementLower, originalStatement) {
-    const categories = [];
-    const mitigations = [];
-    const warnings2 = [];
-    if (statementLower.includes("drop table")) {
-      const tableName = this.extractTableName(statementLower, "drop table");
-      categories.push({
-        type: "DESTRUCTIVE",
-        severity: "CRITICAL",
-        description: "Dropping table will permanently delete all data",
-        affectedObjects: [tableName || "unknown_table"],
-        estimatedImpact: {
-          dataLoss: true,
-          rollbackDifficulty: "IMPOSSIBLE"
-        }
-      });
-      mitigations.push("Create backup before dropping table");
-      mitigations.push("Consider renaming table instead of dropping");
-      warnings2.push("Data will be permanently lost");
-    }
-    if (statementLower.includes("drop column")) {
-      const tableName = this.extractTableName(statementLower, "alter table");
-      categories.push({
-        type: "DESTRUCTIVE",
-        severity: "HIGH",
-        description: "Dropping column will permanently delete column data",
-        affectedObjects: [tableName || "unknown_table"],
-        estimatedImpact: {
-          dataLoss: true,
-          rollbackDifficulty: "IMPOSSIBLE"
-        }
-      });
-      mitigations.push("Create backup of column data before dropping");
-      mitigations.push("Consider renaming column instead of dropping");
-      warnings2.push("Column data will be permanently lost");
-    }
-    if (statementLower.includes("truncate table")) {
-      const tableName = this.extractTableName(statementLower, "truncate table");
-      categories.push({
-        type: "DESTRUCTIVE",
-        severity: "CRITICAL",
-        description: "Truncating table will delete all rows",
-        affectedObjects: [tableName || "unknown_table"],
-        estimatedImpact: {
-          dataLoss: true,
-          rollbackDifficulty: "IMPOSSIBLE"
-        }
-      });
-      mitigations.push("Use DELETE with WHERE clause if you need selective removal");
-      warnings2.push("All table data will be permanently lost");
-    }
-    if (statementLower.includes("delete from") && !statementLower.includes("where")) {
-      const tableName = this.extractTableName(statementLower, "delete from");
-      categories.push({
-        type: "DESTRUCTIVE",
-        severity: "HIGH",
-        description: "DELETE without WHERE clause will remove all rows",
-        affectedObjects: [tableName || "unknown_table"],
-        estimatedImpact: {
-          dataLoss: true,
-          rollbackDifficulty: "HARD"
-        }
-      });
-      warnings2.push("DELETE without WHERE will remove all data");
-      mitigations.push("Add WHERE clause to limit deletion scope");
-    }
-    if (statementLower.includes("update") && !statementLower.includes("where")) {
-      const tableName = this.extractTableName(statementLower, "update");
-      categories.push({
-        type: "DESTRUCTIVE",
-        severity: "MEDIUM",
-        description: "UPDATE without WHERE clause will modify all rows",
-        affectedObjects: [tableName || "unknown_table"],
-        estimatedImpact: {
-          dataLoss: false,
-          rollbackDifficulty: "HARD"
-        }
-      });
-      warnings2.push("UPDATE without WHERE will modify all rows");
-      mitigations.push("Add WHERE clause to limit update scope");
-    }
-    return { categories, mitigations, warnings: warnings2 };
-  }
-  /**
-   * Detect operations with significant performance impact
-   */
-  async detectPerformanceImpacts(statementLower, originalStatement, tableMetadata) {
-    const categories = [];
-    const mitigations = [];
-    const warnings2 = [];
-    if (!tableMetadata) return { categories, mitigations, warnings: warnings2 };
-    for (const table of tableMetadata) {
-      const tableName = table.name.toLowerCase();
-      if (statementLower.includes(tableName)) {
-        if (table.rowCount > 1e6) {
-          if (statementLower.includes("alter table")) {
-            categories.push({
-              type: "PERFORMANCE",
-              severity: "HIGH",
-              description: `Table ${table.name} has ${table.rowCount.toLocaleString()} rows - operation will be slow`,
-              affectedObjects: [table.name],
-              estimatedImpact: {
-                lockDuration: Math.floor(table.rowCount / 1e3),
-                // 1 second per 1000 rows
-                rollbackDifficulty: "MEDIUM"
-              }
-            });
-            mitigations.push("Consider maintenance window for large table operations");
-            mitigations.push("Test operation on staging environment first");
-          }
-          if (statementLower.includes("create index")) {
-            categories.push({
-              type: "PERFORMANCE",
-              severity: "MEDIUM",
-              description: `Index creation on large table ${table.name} will take significant time`,
-              affectedObjects: [table.name],
-              estimatedImpact: {
-                lockDuration: Math.floor(table.rowCount / 5e3),
-                // 1 second per 5000 rows
-                rollbackDifficulty: "EASY"
-              }
-            });
-            mitigations.push("Use CONCURRENTLY option if available");
-            warnings2.push("Monitor index creation progress");
-          }
-        }
-        if (statementLower.includes("add constraint") && statementLower.includes("check")) {
-          categories.push({
-            type: "PERFORMANCE",
-            severity: "MEDIUM",
-            description: `Adding CHECK constraint requires full table scan of ${table.name}`,
-            affectedObjects: [table.name],
-            estimatedImpact: {
-              lockDuration: Math.floor(table.rowCount / 1e4),
-              // 1 second per 10000 rows
-              rollbackDifficulty: "EASY"
-            }
-          });
-          warnings2.push("CHECK constraint validation requires scanning all rows");
-        }
-      }
-    }
-    return { categories, mitigations, warnings: warnings2 };
-  }
-  /**
-   * Detect potential constraint violations
-   */
-  detectConstraintViolations(statementLower, originalStatement) {
-    const categories = [];
-    const mitigations = [];
-    const warnings2 = [];
-    if (statementLower.includes("alter table") && statementLower.includes("not null")) {
-      const tableName = this.extractTableName(statementLower, "alter table");
-      categories.push({
-        type: "CONSTRAINT",
-        severity: "HIGH",
-        description: "Adding NOT NULL constraint may fail if existing NULL values exist",
-        affectedObjects: [tableName || "unknown_table"],
-        estimatedImpact: {
-          rollbackDifficulty: "EASY"
-        }
-      });
-      mitigations.push("Check for NULL values before adding NOT NULL constraint");
-      mitigations.push("Update NULL values with defaults before adding constraint");
-      warnings2.push("Migration will fail if NULL values exist in column");
-    }
-    if (statementLower.includes("add constraint") && statementLower.includes("unique")) {
-      const tableName = this.extractTableName(statementLower, "alter table");
-      categories.push({
-        type: "CONSTRAINT",
-        severity: "MEDIUM",
-        description: "Adding UNIQUE constraint may fail if duplicate values exist",
-        affectedObjects: [tableName || "unknown_table"],
-        estimatedImpact: {
-          rollbackDifficulty: "EASY"
-        }
-      });
-      mitigations.push("Check for duplicate values before adding UNIQUE constraint");
-      mitigations.push("Clean up duplicate data before adding constraint");
-      warnings2.push("Migration will fail if duplicate values exist");
-    }
-    return { categories, mitigations, warnings: warnings2 };
-  }
-  /**
-   * Detect operations that cause downtime
-   */
-  async detectDowntimeOperations(statementLower, originalStatement, tableMetadata) {
-    const categories = [];
-    const mitigations = [];
-    const blockers = [];
-    if (statementLower.includes("rename table") || statementLower.includes("alter table") && statementLower.includes("rename to")) {
-      const tableName = this.extractTableName(statementLower, "alter table");
-      categories.push({
-        type: "DOWNTIME",
-        severity: "HIGH",
-        description: "Renaming table will break application references",
-        affectedObjects: [tableName || "unknown_table"],
-        estimatedImpact: {
-          downtime: 60,
-          // 1 minute estimated
-          rollbackDifficulty: "MEDIUM"
-        }
-      });
-      mitigations.push("Coordinate with application deployment");
-      mitigations.push("Update application code to use new table name");
-      blockers.push("Application must be updated before/after table rename");
-    }
-    if (statementLower.includes("alter column") && statementLower.includes("type")) {
-      const tableName = this.extractTableName(statementLower, "alter table");
-      categories.push({
-        type: "DOWNTIME",
-        severity: "MEDIUM",
-        description: "Changing column type may require data conversion and application updates",
-        affectedObjects: [tableName || "unknown_table"],
-        estimatedImpact: {
-          downtime: 30,
-          // 30 seconds estimated
-          rollbackDifficulty: "HARD"
-        }
-      });
-      mitigations.push("Test data conversion on staging environment");
-      mitigations.push("Verify application compatibility with new data type");
-      warnings.push("Data conversion may fail if values are incompatible");
-    }
-    return { categories, mitigations, blockers };
-  }
-  /**
-   * Extract table name from SQL statement
-   */
-  extractTableName(statement, afterKeyword) {
-    const regex = new RegExp(`${afterKeyword}\\s+([\\w\\-_\\.]+)`, "i");
-    const match = statement.match(regex);
-    return match ? match[1] : null;
-  }
-};
-
-// src/enhancer/enhancement-strategies.ts
-var ENHANCEMENT_RULES = [
-  // SAFETY ENHANCEMENTS (1-15)
-  {
-    id: "safe-not-null-addition",
-    name: "Safe NOT NULL Column Addition",
-    description: "Add columns as nullable first, populate with defaults, then apply NOT NULL constraint",
-    category: "SAFETY",
-    priority: "HIGH",
-    applies: (sql) => sql.toLowerCase().includes("add column") && sql.toLowerCase().includes("not null") && !sql.toLowerCase().includes("default"),
-    enhance: (sql) => {
-      const tableMatch = sql.match(/alter\s+table\s+(\w+)/i);
-      const columnMatch = sql.match(/add\s+column\s+(\w+)\s+([^,\s]+)/i);
-      if (!tableMatch || !columnMatch) return [];
-      const [, tableName] = tableMatch;
-      const [, columnName, columnType] = columnMatch;
-      return [
-        {
-          stepNumber: 1,
-          description: `Add ${columnName} as nullable column`,
-          sql: `ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${columnType};`,
-          riskLevel: "LOW",
-          estimatedDuration: 5,
-          canRollback: true,
-          dependencies: [],
-          validationQueries: [`SELECT COUNT(*) FROM information_schema.columns WHERE table_name = '${tableName}' AND column_name = '${columnName}'`],
-          onFailure: "ROLLBACK"
-        },
-        {
-          stepNumber: 2,
-          description: `Populate ${columnName} with default values`,
-          sql: `UPDATE ${tableName} SET ${columnName} = '' WHERE ${columnName} IS NULL;`,
-          riskLevel: "MEDIUM",
-          estimatedDuration: 30,
-          canRollback: true,
-          dependencies: [],
-          validationQueries: [`SELECT COUNT(*) FROM ${tableName} WHERE ${columnName} IS NULL`],
-          onFailure: "ROLLBACK"
-        },
-        {
-          stepNumber: 3,
-          description: `Apply NOT NULL constraint to ${columnName}`,
-          sql: `ALTER TABLE ${tableName} ALTER COLUMN ${columnName} SET NOT NULL;`,
-          riskLevel: "LOW",
-          estimatedDuration: 5,
-          canRollback: true,
-          dependencies: [],
-          validationQueries: [`SELECT is_nullable FROM information_schema.columns WHERE table_name = '${tableName}' AND column_name = '${columnName}'`],
-          onFailure: "ROLLBACK"
-        }
-      ];
-    },
-    example: {
-      before: "ALTER TABLE users ADD COLUMN email VARCHAR(255) NOT NULL;",
-      after: `-- Step 1: Add nullable column
-ALTER TABLE users ADD COLUMN email VARCHAR(255);
--- Step 2: Populate with defaults  
-UPDATE users SET email = '' WHERE email IS NULL;
--- Step 3: Apply NOT NULL constraint
-ALTER TABLE users ALTER COLUMN email SET NOT NULL;`,
-      explanation: "Prevents migration failures when adding NOT NULL columns to tables with existing data"
-    }
-  },
-  {
-    id: "concurrent-index-creation",
-    name: "Concurrent Index Creation",
-    description: "Create indexes concurrently to avoid table locks",
-    category: "PERFORMANCE",
-    priority: "HIGH",
-    applies: (sql) => sql.toLowerCase().includes("create index") && !sql.toLowerCase().includes("concurrently"),
-    enhance: (sql) => [{
-      stepNumber: 1,
-      description: "Create index concurrently to avoid table locks",
-      sql: sql.replace(/CREATE INDEX/gi, "CREATE INDEX CONCURRENTLY"),
-      riskLevel: "LOW",
-      estimatedDuration: 120,
-      canRollback: true,
-      dependencies: [],
-      validationQueries: [],
-      onFailure: "CONTINUE"
-    }],
-    example: {
-      before: "CREATE INDEX idx_user_email ON users(email);",
-      after: "CREATE INDEX CONCURRENTLY idx_user_email ON users(email);",
-      explanation: "Avoids blocking table writes during index creation, essential for production databases"
-    }
-  },
-  {
-    id: "constraint-not-valid",
-    name: "Safe Constraint Addition",
-    description: "Add constraints as NOT VALID first, then validate separately",
-    category: "SAFETY",
-    priority: "HIGH",
-    applies: (sql) => sql.toLowerCase().includes("add constraint") && !sql.toLowerCase().includes("not valid"),
-    enhance: (sql) => {
-      const tableMatch = sql.match(/alter\s+table\s+(\w+)/i);
-      const constraintMatch = sql.match(/add\s+constraint\s+(\w+)/i);
-      if (!tableMatch || !constraintMatch) return [];
-      const [, tableName] = tableMatch;
-      const [, constraintName] = constraintMatch;
-      return [
-        {
-          stepNumber: 1,
-          description: "Add constraint without validation",
-          sql: sql.replace(/;?\s*$/, " NOT VALID;"),
-          riskLevel: "LOW",
-          estimatedDuration: 5,
-          canRollback: true,
-          dependencies: [],
-          validationQueries: [],
-          onFailure: "ROLLBACK"
-        },
-        {
-          stepNumber: 2,
-          description: "Validate constraint in separate transaction",
-          sql: `ALTER TABLE ${tableName} VALIDATE CONSTRAINT ${constraintName};`,
-          riskLevel: "MEDIUM",
-          estimatedDuration: 60,
-          canRollback: true,
-          dependencies: [],
-          validationQueries: [],
-          onFailure: "CONTINUE"
-        }
-      ];
-    },
-    example: {
-      before: "ALTER TABLE orders ADD CONSTRAINT fk_customer FOREIGN KEY (customer_id) REFERENCES customers(id);",
-      after: `ALTER TABLE orders ADD CONSTRAINT fk_customer FOREIGN KEY (customer_id) REFERENCES customers(id) NOT VALID;
-ALTER TABLE orders VALIDATE CONSTRAINT fk_customer;`,
-      explanation: "Reduces lock time by adding constraint without validation first, then validating separately"
-    }
-  },
-  {
-    id: "data-backup-before-drop",
-    name: "Data Backup Before Destructive Operations",
-    description: "Create backups before dropping columns or tables",
-    category: "SAFETY",
-    priority: "CRITICAL",
-    applies: (sql) => sql.toLowerCase().includes("drop column") || sql.toLowerCase().includes("drop table"),
-    enhance: (sql) => {
-      const dropColumnMatch = sql.match(/alter\s+table\s+(\w+)\s+drop\s+column\s+(\w+)/i);
-      const dropTableMatch = sql.match(/drop\s+table\s+(\w+)/i);
-      if (dropColumnMatch) {
-        const [, tableName, columnName] = dropColumnMatch;
-        return [
-          {
-            stepNumber: 1,
-            description: `Backup ${columnName} data before dropping`,
-            sql: `CREATE TABLE ${tableName}_${columnName}_backup AS SELECT id, ${columnName} FROM ${tableName};`,
-            riskLevel: "LOW",
-            estimatedDuration: 30,
-            canRollback: true,
-            dependencies: [],
-            validationQueries: [`SELECT COUNT(*) FROM ${tableName}_${columnName}_backup`],
-            onFailure: "STOP"
-          },
-          {
-            stepNumber: 2,
-            description: `Drop column ${columnName}`,
-            sql,
-            riskLevel: "HIGH",
-            estimatedDuration: 15,
-            canRollback: false,
-            dependencies: [],
-            validationQueries: [],
-            onFailure: "STOP"
-          }
-        ];
-      } else if (dropTableMatch) {
-        const [, tableName] = dropTableMatch;
-        return [
-          {
-            stepNumber: 1,
-            description: `Backup table ${tableName} before dropping`,
-            sql: `CREATE TABLE ${tableName}_backup_${Date.now()} AS SELECT * FROM ${tableName};`,
-            riskLevel: "LOW",
-            estimatedDuration: 60,
-            canRollback: true,
-            dependencies: [],
-            validationQueries: [`SELECT COUNT(*) FROM ${tableName}_backup_${Date.now()}`],
-            onFailure: "STOP"
-          },
-          {
-            stepNumber: 2,
-            description: `Drop table ${tableName}`,
-            sql,
-            riskLevel: "CRITICAL",
-            estimatedDuration: 5,
-            canRollback: false,
-            dependencies: [],
-            validationQueries: [],
-            onFailure: "STOP"
-          }
-        ];
-      }
-      return [];
-    },
-    example: {
-      before: "ALTER TABLE users DROP COLUMN old_field;",
-      after: `CREATE TABLE users_old_field_backup AS SELECT id, old_field FROM users;
-ALTER TABLE users DROP COLUMN old_field;`,
-      explanation: "Creates a backup table with the data being dropped, enabling recovery if needed"
-    }
-  },
-  {
-    id: "query-timeout-setting",
-    name: "Query Timeout Configuration",
-    description: "Set appropriate timeouts to prevent long-running locks",
-    category: "RELIABILITY",
-    priority: "MEDIUM",
-    applies: (sql) => sql.toLowerCase().includes("alter table") || sql.toLowerCase().includes("create index"),
-    enhance: (sql) => [{
-      stepNumber: 1,
-      description: "Configure query timeouts for safety",
-      sql: `SET statement_timeout = '10min';
-SET lock_timeout = '30s';
-${sql}
-RESET statement_timeout;
-RESET lock_timeout;`,
-      riskLevel: "LOW",
-      estimatedDuration: 5,
-      canRollback: true,
-      dependencies: [],
-      validationQueries: [],
-      onFailure: "CONTINUE"
-    }],
-    example: {
-      before: "ALTER TABLE users ADD COLUMN status VARCHAR(20);",
-      after: `SET statement_timeout = '10min';
-SET lock_timeout = '30s';
-ALTER TABLE users ADD COLUMN status VARCHAR(20);
-RESET statement_timeout;
-RESET lock_timeout;`,
-      explanation: "Prevents indefinite locks by setting reasonable timeout limits"
-    }
-  },
-  {
-    id: "transaction-isolation",
-    name: "Proper Transaction Isolation",
-    description: "Wrap operations in appropriate transaction boundaries",
-    category: "RELIABILITY",
-    priority: "MEDIUM",
-    applies: (sql) => !sql.toLowerCase().includes("begin") && !sql.toLowerCase().includes("start transaction"),
-    enhance: (sql) => [{
-      stepNumber: 1,
-      description: "Execute with proper transaction boundaries",
-      sql: `BEGIN;
-${sql}
-COMMIT;`,
-      riskLevel: "LOW",
-      estimatedDuration: 5,
-      canRollback: true,
-      dependencies: [],
-      validationQueries: [],
-      onFailure: "ROLLBACK"
-    }],
-    example: {
-      before: "UPDATE users SET status = 'active' WHERE created_at > NOW() - INTERVAL '1 day';",
-      after: `BEGIN;
-UPDATE users SET status = 'active' WHERE created_at > NOW() - INTERVAL '1 day';
-COMMIT;`,
-      explanation: "Ensures atomic execution and enables rollback if errors occur"
-    }
-  },
-  {
-    id: "batch-updates",
-    name: "Batch Large Updates",
-    description: "Break large updates into smaller batches to reduce lock time",
-    category: "PERFORMANCE",
-    priority: "HIGH",
-    applies: (sql) => sql.toLowerCase().includes("update") && !sql.toLowerCase().includes("limit"),
-    enhance: (sql) => {
-      const updateMatch = sql.match(/update\s+(\w+)\s+set\s+(.+?)\s+where\s+(.+)/i);
-      if (!updateMatch) return [];
-      const [, tableName, setClause, whereClause] = updateMatch;
-      return [
-        {
-          stepNumber: 1,
-          description: "Update records in batches to reduce lock time",
-          sql: `DO $$
-DECLARE
-  batch_size INTEGER := 1000;
-  rows_affected INTEGER;
-BEGIN
-  LOOP
-    UPDATE ${tableName} SET ${setClause} 
-    WHERE ${whereClause} AND ctid IN (
-      SELECT ctid FROM ${tableName} 
-      WHERE ${whereClause} 
-      LIMIT batch_size
-    );
-    
-    GET DIAGNOSTICS rows_affected = ROW_COUNT;
-    EXIT WHEN rows_affected = 0;
-    
-    COMMIT;
-    PERFORM pg_sleep(0.1);
-  END LOOP;
-END $$;`,
-          riskLevel: "MEDIUM",
-          estimatedDuration: 120,
-          canRollback: true,
-          dependencies: [],
-          validationQueries: [],
-          onFailure: "CONTINUE"
-        }
-      ];
-    },
-    example: {
-      before: "UPDATE users SET last_login = NOW() WHERE status = 'inactive';",
-      after: `-- Updates in batches of 1000 to reduce lock time
-DO $$
-DECLARE
-  batch_size INTEGER := 1000;
-  rows_affected INTEGER;
-BEGIN
-  LOOP
-    UPDATE users SET last_login = NOW() 
-    WHERE status = 'inactive' AND ctid IN (
-      SELECT ctid FROM users 
-      WHERE status = 'inactive' 
-      LIMIT batch_size
-    );
-    
-    GET DIAGNOSTICS rows_affected = ROW_COUNT;
-    EXIT WHEN rows_affected = 0;
-    
-    COMMIT;
-    PERFORM pg_sleep(0.1);
-  END LOOP;
-END $$;`,
-      explanation: "Reduces table lock time by processing records in small batches with short breaks"
-    }
-  },
-  {
-    id: "enum-safe-addition",
-    name: "Safe ENUM Value Addition",
-    description: "Add ENUM values safely without recreating the type",
-    category: "SAFETY",
-    priority: "MEDIUM",
-    applies: (sql) => sql.toLowerCase().includes("alter type") && sql.toLowerCase().includes("add value"),
-    enhance: (sql) => [{
-      stepNumber: 1,
-      description: "Add ENUM value with IF NOT EXISTS check",
-      sql: sql.replace(/ADD VALUE/gi, "ADD VALUE IF NOT EXISTS"),
-      riskLevel: "LOW",
-      estimatedDuration: 5,
-      canRollback: true,
-      dependencies: [],
-      validationQueries: [],
-      onFailure: "ROLLBACK"
-    }],
-    example: {
-      before: "ALTER TYPE user_status ADD VALUE 'suspended';",
-      after: "ALTER TYPE user_status ADD VALUE IF NOT EXISTS 'suspended';",
-      explanation: "Prevents errors if the ENUM value already exists, making migrations idempotent"
-    }
-  },
-  {
-    id: "index-naming-convention",
-    name: "Standardized Index Naming",
-    description: "Ensure consistent index naming conventions",
-    category: "RELIABILITY",
-    priority: "LOW",
-    applies: (sql) => sql.toLowerCase().includes("create index"),
-    enhance: (sql) => {
-      const indexMatch = sql.match(/create\s+index\s+(?:concurrently\s+)?(\w+)/i);
-      const tableMatch = sql.match(/on\s+(\w+)/i);
-      if (indexMatch && tableMatch) {
-        const [, indexName] = indexMatch;
-        const [, tableName] = tableMatch;
-        if (!indexName.startsWith(`idx_${tableName}`)) {
-          const enhancedSQL = sql.replace(indexName, `idx_${tableName}_${indexName}`);
-          return [{
-            stepNumber: 1,
-            description: "Create index with standardized naming convention",
-            sql: enhancedSQL,
-            riskLevel: "LOW",
-            estimatedDuration: 60,
-            canRollback: true,
-            dependencies: [],
-            validationQueries: [],
-            onFailure: "ROLLBACK"
-          }];
-        }
-      }
-      return [];
-    },
-    example: {
-      before: "CREATE INDEX user_email ON users(email);",
-      after: "CREATE INDEX idx_users_user_email ON users(email);",
-      explanation: "Standardizes index names for better maintainability and consistency"
-    }
-  },
-  {
-    id: "foreign-key-validation",
-    name: "Foreign Key Data Validation",
-    description: "Validate referential integrity before adding foreign keys",
-    category: "VALIDATION",
-    priority: "HIGH",
-    applies: (sql) => sql.toLowerCase().includes("foreign key"),
-    enhance: (sql) => {
-      const fkMatch = sql.match(/alter\s+table\s+(\w+)\s+add\s+constraint\s+\w+\s+foreign\s+key\s*\((\w+)\)\s+references\s+(\w+)\s*\((\w+)\)/i);
-      if (!fkMatch) return [];
-      const [, childTable, childColumn, parentTable, parentColumn] = fkMatch;
-      return [
-        {
-          stepNumber: 1,
-          description: "Validate referential integrity before adding foreign key",
-          sql: `DO $$
-BEGIN
-  IF EXISTS (
-    SELECT 1 FROM ${childTable} c
-    LEFT JOIN ${parentTable} p ON c.${childColumn} = p.${parentColumn}
-    WHERE c.${childColumn} IS NOT NULL AND p.${parentColumn} IS NULL
-  ) THEN
-    RAISE EXCEPTION 'Referential integrity violation: orphaned records found in ${childTable}.${childColumn}';
-  END IF;
-END $$;`,
-          riskLevel: "MEDIUM",
-          estimatedDuration: 30,
-          canRollback: true,
-          dependencies: [],
-          validationQueries: [],
-          onFailure: "STOP"
-        },
-        {
-          stepNumber: 2,
-          description: "Add foreign key constraint",
-          sql,
-          riskLevel: "MEDIUM",
-          estimatedDuration: 15,
-          canRollback: true,
-          dependencies: [],
-          validationQueries: [],
-          onFailure: "ROLLBACK"
-        }
-      ];
-    },
-    example: {
-      before: "ALTER TABLE orders ADD CONSTRAINT fk_customer FOREIGN KEY (customer_id) REFERENCES customers(id);",
-      after: `-- Validate referential integrity first
-DO $$
-BEGIN
-  IF EXISTS (
-    SELECT 1 FROM orders o
-    LEFT JOIN customers c ON o.customer_id = c.id
-    WHERE o.customer_id IS NOT NULL AND c.id IS NULL
-  ) THEN
-    RAISE EXCEPTION 'Referential integrity violation: orphaned records found';
-  END IF;
-END $$;
-
--- Add foreign key constraint
-ALTER TABLE orders ADD CONSTRAINT fk_customer FOREIGN KEY (customer_id) REFERENCES customers(id);`,
-      explanation: "Prevents foreign key creation failures by validating data integrity first"
-    }
-  },
-  // PERFORMANCE ENHANCEMENTS (11-25)
-  {
-    id: "analyze-after-changes",
-    name: "Update Statistics After Schema Changes",
-    description: "Update table statistics after structural changes",
-    category: "PERFORMANCE",
-    priority: "MEDIUM",
-    applies: (sql) => sql.toLowerCase().includes("alter table") || sql.toLowerCase().includes("create index"),
-    enhance: (sql) => {
-      const tableMatch = sql.match(/(?:alter\s+table|on)\s+(\w+)/i);
-      if (!tableMatch) return [];
-      const [, tableName] = tableMatch;
-      return [
-        {
-          stepNumber: 1,
-          description: "Execute schema change",
-          sql,
-          riskLevel: "MEDIUM",
-          estimatedDuration: 30,
-          canRollback: true,
-          dependencies: [],
-          validationQueries: [],
-          onFailure: "ROLLBACK"
-        },
-        {
-          stepNumber: 2,
-          description: "Update table statistics for query planner",
-          sql: `ANALYZE ${tableName};`,
-          riskLevel: "LOW",
-          estimatedDuration: 10,
-          canRollback: true,
-          dependencies: [],
-          validationQueries: [],
-          onFailure: "CONTINUE"
-        }
-      ];
-    },
-    example: {
-      before: "ALTER TABLE users ADD COLUMN created_at TIMESTAMP;",
-      after: `ALTER TABLE users ADD COLUMN created_at TIMESTAMP;
-ANALYZE users;`,
-      explanation: "Updates query planner statistics to ensure optimal query performance after schema changes"
-    }
-  },
-  {
-    id: "vacuum-after-bulk-changes",
-    name: "Vacuum After Bulk Operations",
-    description: "Reclaim space and update statistics after bulk changes",
-    category: "PERFORMANCE",
-    priority: "MEDIUM",
-    applies: (sql) => sql.toLowerCase().includes("update") || sql.toLowerCase().includes("delete"),
-    enhance: (sql) => {
-      const tableMatch = sql.match(/(?:update|delete\s+from)\s+(\w+)/i);
-      if (!tableMatch) return [];
-      const [, tableName] = tableMatch;
-      return [
-        {
-          stepNumber: 1,
-          description: "Execute bulk operation",
-          sql,
-          riskLevel: "MEDIUM",
-          estimatedDuration: 60,
-          canRollback: true,
-          dependencies: [],
-          validationQueries: [],
-          onFailure: "ROLLBACK"
-        },
-        {
-          stepNumber: 2,
-          description: "Vacuum table to reclaim space and update statistics",
-          sql: `VACUUM ANALYZE ${tableName};`,
-          riskLevel: "LOW",
-          estimatedDuration: 30,
-          canRollback: true,
-          dependencies: [],
-          validationQueries: [],
-          onFailure: "CONTINUE"
-        }
-      ];
-    },
-    example: {
-      before: "DELETE FROM audit_logs WHERE created_at < NOW() - INTERVAL '1 year';",
-      after: `DELETE FROM audit_logs WHERE created_at < NOW() - INTERVAL '1 year';
-VACUUM ANALYZE audit_logs;`,
-      explanation: "Reclaims disk space and updates statistics after bulk delete operations"
-    }
-  },
-  {
-    id: "partial-index-optimization",
-    name: "Partial Index Optimization",
-    description: "Suggest partial indexes for filtered queries",
-    category: "PERFORMANCE",
-    priority: "MEDIUM",
-    applies: (sql) => sql.toLowerCase().includes("create index") && !sql.toLowerCase().includes("where"),
-    enhance: (sql) => {
-      return [{
-        stepNumber: 1,
-        description: "Create index (consider partial index for better performance)",
-        sql: `${sql}
--- OPTIMIZATION SUGGESTION: Consider a partial index if this column has many NULL values or a common filter condition
--- Example: CREATE INDEX idx_users_email ON users(email) WHERE email IS NOT NULL;`,
-        riskLevel: "LOW",
-        estimatedDuration: 60,
-        canRollback: true,
-        dependencies: [],
-        validationQueries: [],
-        onFailure: "ROLLBACK"
-      }];
-    },
-    example: {
-      before: "CREATE INDEX idx_users_status ON users(status);",
-      after: `CREATE INDEX idx_users_status ON users(status);
--- OPTIMIZATION SUGGESTION: Consider partial index for active users only:
--- CREATE INDEX idx_users_active_status ON users(status) WHERE status = 'active';`,
-      explanation: "Suggests partial indexes to reduce index size and improve performance for filtered queries"
-    }
-  },
-  {
-    id: "connection-pooling-check",
-    name: "Connection Pool Validation",
-    description: "Validate connection pool settings before long operations",
-    category: "RELIABILITY",
-    priority: "LOW",
-    applies: (sql) => sql.toLowerCase().includes("create index") || sql.toLowerCase().includes("alter table") && sql.toLowerCase().includes("add column"),
-    enhance: (sql) => [{
-      stepNumber: 1,
-      description: "Execute with connection pool awareness",
-      sql: `-- Connection pool check: Ensure sufficient connections for migration
--- Current active connections should be monitored during this operation
-${sql}`,
-      riskLevel: "LOW",
-      estimatedDuration: 60,
-      canRollback: true,
-      dependencies: [],
-      validationQueries: ["SELECT count(*) FROM pg_stat_activity WHERE state = 'active'"],
-      onFailure: "CONTINUE"
-    }],
-    example: {
-      before: "CREATE INDEX idx_large_table_column ON large_table(column);",
-      after: `-- Connection pool check: Ensure sufficient connections for migration
--- Current active connections should be monitored during this operation
-CREATE INDEX idx_large_table_column ON large_table(column);`,
-      explanation: "Adds awareness about connection pool impact during long-running operations"
-    }
-  },
-  {
-    id: "memory-usage-optimization",
-    name: "Memory Usage Optimization",
-    description: "Configure memory settings for large operations",
-    category: "PERFORMANCE",
-    priority: "MEDIUM",
-    applies: (sql) => sql.toLowerCase().includes("create index") || sql.toLowerCase().includes("alter table"),
-    enhance: (sql) => [{
-      stepNumber: 1,
-      description: "Optimize memory settings for operation",
-      sql: `-- Temporarily increase work memory for this operation
-SET work_mem = '256MB';
-SET maintenance_work_mem = '512MB';
-
-${sql}
-
--- Reset to default values
-RESET work_mem;
-RESET maintenance_work_mem;`,
-      riskLevel: "LOW",
-      estimatedDuration: 60,
-      canRollback: true,
-      dependencies: [],
-      validationQueries: [],
-      onFailure: "CONTINUE"
-    }],
-    example: {
-      before: "CREATE INDEX idx_users_name ON users(first_name, last_name);",
-      after: `-- Temporarily increase work memory for this operation
-SET work_mem = '256MB';
-SET maintenance_work_mem = '512MB';
-
-CREATE INDEX idx_users_name ON users(first_name, last_name);
-
--- Reset to default values
-RESET work_mem;
-RESET maintenance_work_mem;`,
-      explanation: "Optimizes memory usage for index creation and other memory-intensive operations"
-    }
-  },
-  // MONITORING ENHANCEMENTS (26-35)
-  {
-    id: "progress-monitoring",
-    name: "Progress Monitoring for Long Operations",
-    description: "Add progress monitoring for long-running operations",
-    category: "MONITORING",
-    priority: "MEDIUM",
-    applies: (sql) => sql.toLowerCase().includes("create index") || sql.toLowerCase().includes("reindex"),
-    enhance: (sql) => [{
-      stepNumber: 1,
-      description: "Execute with progress monitoring",
-      sql: `-- Enable progress reporting for index operations
-SET log_statement = 'all';
-SET log_min_duration_statement = 0;
-
-${sql}
-
--- Monitor progress with:
--- SELECT phase, round(100.0 * blocks_done / nullif(blocks_total, 0), 1) AS "%" FROM pg_stat_progress_create_index;
-
-RESET log_statement;
-RESET log_min_duration_statement;`,
-      riskLevel: "LOW",
-      estimatedDuration: 120,
-      canRollback: true,
-      dependencies: [],
-      validationQueries: [],
-      onFailure: "CONTINUE"
-    }],
-    example: {
-      before: "CREATE INDEX idx_orders_date ON orders(created_at);",
-      after: `-- Enable progress reporting for index operations
-SET log_statement = 'all';
-SET log_min_duration_statement = 0;
-
-CREATE INDEX idx_orders_date ON orders(created_at);
-
--- Monitor progress with:
--- SELECT phase, round(100.0 * blocks_done / nullif(blocks_total, 0), 1) AS "%" FROM pg_stat_progress_create_index;
-
-RESET log_statement;
-RESET log_min_duration_statement;`,
-      explanation: "Enables progress monitoring for long-running index creation operations"
-    }
-  },
-  {
-    id: "lock-monitoring",
-    name: "Lock Monitoring and Alerting",
-    description: "Monitor locks during critical operations",
-    category: "MONITORING",
-    priority: "HIGH",
-    applies: (sql) => sql.toLowerCase().includes("alter table") || sql.toLowerCase().includes("drop"),
-    enhance: (sql) => [{
-      stepNumber: 1,
-      description: "Execute with lock monitoring",
-      sql: `-- Monitor locks before and during operation
-SELECT 
-  pg_stat_activity.pid,
-  pg_stat_activity.query,
-  pg_locks.mode,
-  pg_locks.granted
-FROM pg_locks 
-JOIN pg_stat_activity ON pg_locks.pid = pg_stat_activity.pid
-WHERE NOT pg_locks.granted;
-
-${sql}
-
--- Check for remaining locks after operation
-SELECT count(*) as remaining_locks FROM pg_locks WHERE NOT granted;`,
-      riskLevel: "MEDIUM",
-      estimatedDuration: 30,
-      canRollback: true,
-      dependencies: [],
-      validationQueries: ["SELECT count(*) FROM pg_locks WHERE NOT granted"],
-      onFailure: "ROLLBACK"
-    }],
-    example: {
-      before: "ALTER TABLE users DROP COLUMN deprecated_field;",
-      after: `-- Monitor locks before and during operation
-SELECT 
-  pg_stat_activity.pid,
-  pg_stat_activity.query,
-  pg_locks.mode,
-  pg_locks.granted
-FROM pg_locks 
-JOIN pg_stat_activity ON pg_locks.pid = pg_stat_activity.pid
-WHERE NOT pg_locks.granted;
-
-ALTER TABLE users DROP COLUMN deprecated_field;
-
--- Check for remaining locks after operation
-SELECT count(*) as remaining_locks FROM pg_locks WHERE NOT granted;`,
-      explanation: "Monitors database locks to detect potential blocking issues during schema changes"
-    }
-  },
-  {
-    id: "performance-impact-measurement",
-    name: "Performance Impact Measurement",
-    description: "Measure performance impact before and after changes",
-    category: "MONITORING",
-    priority: "MEDIUM",
-    applies: (sql) => sql.toLowerCase().includes("create index") || sql.toLowerCase().includes("alter table"),
-    enhance: (sql) => {
-      const tableMatch = sql.match(/(?:alter\s+table|on)\s+(\w+)/i);
-      if (!tableMatch) return [];
-      const [, tableName] = tableMatch;
-      return [{
-        stepNumber: 1,
-        description: "Measure performance impact",
-        sql: `-- Measure performance before change
-SELECT 
-  schemaname,
-  tablename,
-  seq_scan,
-  seq_tup_read,
-  idx_scan,
-  idx_tup_fetch
-FROM pg_stat_user_tables 
-WHERE tablename = '${tableName}';
-
-${sql}
-
--- Measure performance after change
-SELECT 
-  schemaname,
-  tablename,
-  seq_scan,
-  seq_tup_read,
-  idx_scan,
-  idx_tup_fetch
-FROM pg_stat_user_tables 
-WHERE tablename = '${tableName}';`,
-        riskLevel: "LOW",
-        estimatedDuration: 60,
-        canRollback: true,
-        dependencies: [],
-        validationQueries: [],
-        onFailure: "CONTINUE"
-      }];
-    },
-    example: {
-      before: "CREATE INDEX idx_users_email ON users(email);",
-      after: `-- Measure performance before change
-SELECT 
-  schemaname,
-  tablename,
-  seq_scan,
-  seq_tup_read,
-  idx_scan,
-  idx_tup_fetch
-FROM pg_stat_user_tables 
-WHERE tablename = 'users';
-
-CREATE INDEX idx_users_email ON users(email);
-
--- Measure performance after change
-SELECT 
-  schemaname,
-  tablename,
-  seq_scan,
-  seq_tup_read,
-  idx_scan,
-  idx_tup_fetch
-FROM pg_stat_user_tables 
-WHERE tablename = 'users';`,
-      explanation: "Captures performance metrics to measure the impact of schema changes"
-    }
-  },
-  // VALIDATION ENHANCEMENTS (36-45)
-  {
-    id: "data-integrity-check",
-    name: "Comprehensive Data Integrity Validation",
-    description: "Validate data integrity after schema changes",
-    category: "VALIDATION",
-    priority: "HIGH",
-    applies: (sql) => sql.toLowerCase().includes("alter table") || sql.toLowerCase().includes("update"),
-    enhance: (sql) => {
-      const tableMatch = sql.match(/(?:alter\s+table|update)\s+(\w+)/i);
-      if (!tableMatch) return [];
-      const [, tableName] = tableMatch;
-      return [
-        {
-          stepNumber: 1,
-          description: "Execute operation",
-          sql,
-          riskLevel: "MEDIUM",
-          estimatedDuration: 30,
-          canRollback: true,
-          dependencies: [],
-          validationQueries: [],
-          onFailure: "ROLLBACK"
-        },
-        {
-          stepNumber: 2,
-          description: "Validate data integrity",
-          sql: `-- Comprehensive data integrity checks
-SELECT 
-  'Null checks' as check_type,
-  count(*) as issues_found
-FROM ${tableName} 
-WHERE id IS NULL
-UNION ALL
-SELECT 
-  'Duplicate checks' as check_type,
-  count(*) - count(DISTINCT id) as issues_found
-FROM ${tableName}
-UNION ALL
-SELECT
-  'Constraint violations' as check_type,
-  count(*) as issues_found
-FROM information_schema.table_constraints tc
-JOIN information_schema.constraint_column_usage ccu ON tc.constraint_name = ccu.constraint_name
-WHERE tc.table_name = '${tableName}' AND tc.constraint_type = 'CHECK';`,
-          riskLevel: "LOW",
-          estimatedDuration: 15,
-          canRollback: true,
-          dependencies: [],
-          validationQueries: [],
-          onFailure: "CONTINUE"
-        }
-      ];
-    },
-    example: {
-      before: "ALTER TABLE users ADD COLUMN email_verified BOOLEAN DEFAULT FALSE;",
-      after: `ALTER TABLE users ADD COLUMN email_verified BOOLEAN DEFAULT FALSE;
-
--- Comprehensive data integrity checks
-SELECT 
-  'Null checks' as check_type,
-  count(*) as issues_found
-FROM users 
-WHERE id IS NULL
-UNION ALL
-SELECT 
-  'Duplicate checks' as check_type,
-  count(*) - count(DISTINCT id) as issues_found
-FROM users;`,
-      explanation: "Performs comprehensive data integrity validation after schema changes"
-    }
-  },
-  {
-    id: "constraint-verification",
-    name: "Constraint Verification",
-    description: "Verify all constraints are properly enforced",
-    category: "VALIDATION",
-    priority: "HIGH",
-    applies: (sql) => sql.toLowerCase().includes("add constraint"),
-    enhance: (sql) => {
-      const tableMatch = sql.match(/alter\s+table\s+(\w+)/i);
-      const constraintMatch = sql.match(/add\s+constraint\s+(\w+)/i);
-      if (!tableMatch || !constraintMatch) return [];
-      const [, tableName] = tableMatch;
-      const [, constraintName] = constraintMatch;
-      return [
-        {
-          stepNumber: 1,
-          description: "Add constraint",
-          sql,
-          riskLevel: "MEDIUM",
-          estimatedDuration: 30,
-          canRollback: true,
-          dependencies: [],
-          validationQueries: [],
-          onFailure: "ROLLBACK"
-        },
-        {
-          stepNumber: 2,
-          description: "Verify constraint is properly enforced",
-          sql: `-- Verify constraint was created and is active
-SELECT 
-  tc.constraint_name,
-  tc.constraint_type,
-  cc.check_clause,
-  tc.is_deferrable,
-  tc.initially_deferred
-FROM information_schema.table_constraints tc
-LEFT JOIN information_schema.check_constraints cc ON tc.constraint_name = cc.constraint_name
-WHERE tc.table_name = '${tableName}' 
-  AND tc.constraint_name = '${constraintName}';
-
--- Test constraint enforcement (this should fail if constraint is working)
--- INSERT INTO ${tableName} VALUES (/* values that should violate constraint */);`,
-          riskLevel: "LOW",
-          estimatedDuration: 10,
-          canRollback: true,
-          dependencies: [],
-          validationQueries: [],
-          onFailure: "CONTINUE"
-        }
-      ];
-    },
-    example: {
-      before: "ALTER TABLE users ADD CONSTRAINT chk_age CHECK (age >= 0);",
-      after: `ALTER TABLE users ADD CONSTRAINT chk_age CHECK (age >= 0);
-
--- Verify constraint was created and is active
-SELECT 
-  tc.constraint_name,
-  tc.constraint_type,
-  cc.check_clause,
-  tc.is_deferrable,
-  tc.initially_deferred
-FROM information_schema.table_constraints tc
-LEFT JOIN information_schema.check_constraints cc ON tc.constraint_name = cc.constraint_name
-WHERE tc.table_name = 'users' 
-  AND tc.constraint_name = 'chk_age';`,
-      explanation: "Verifies that constraints are properly created and enforced"
-    }
-  },
-  // ROLLBACK ENHANCEMENTS (46-50)
-  {
-    id: "automatic-rollback-script",
-    name: "Automatic Rollback Script Generation",
-    description: "Generate rollback scripts for all operations",
-    category: "ROLLBACK",
-    priority: "HIGH",
-    applies: (sql) => true,
-    enhance: (sql) => {
-      const rollbackSQL = generateRollbackSQL(sql);
-      return [{
-        stepNumber: 1,
-        description: "Execute with rollback script generation",
-        sql: `${sql}
-
--- GENERATED ROLLBACK SCRIPT (save this for emergency rollback):
-/*
-${rollbackSQL}
-*/`,
-        riskLevel: "MEDIUM",
-        estimatedDuration: 30,
-        canRollback: true,
-        dependencies: [],
-        validationQueries: [],
-        onFailure: "ROLLBACK"
-      }];
-    },
-    example: {
-      before: "ALTER TABLE users ADD COLUMN email VARCHAR(255);",
-      after: `ALTER TABLE users ADD COLUMN email VARCHAR(255);
-
--- GENERATED ROLLBACK SCRIPT (save this for emergency rollback):
-/*
-ALTER TABLE users DROP COLUMN email;
-*/`,
-      explanation: "Automatically generates rollback scripts for quick recovery"
-    }
-  },
-  {
-    id: "rollback-testing",
-    name: "Rollback Testing",
-    description: "Test rollback procedures before applying changes",
-    category: "ROLLBACK",
-    priority: "MEDIUM",
-    applies: (sql) => sql.toLowerCase().includes("alter table") || sql.toLowerCase().includes("create index"),
-    enhance: (sql) => {
-      const rollbackSQL = generateRollbackSQL(sql);
-      return [
-        {
-          stepNumber: 1,
-          description: "Test rollback procedure in transaction",
-          sql: `-- Test rollback procedure
-BEGIN;
-${sql}
--- Verify change was applied
-${rollbackSQL}
--- Verify rollback worked
-ROLLBACK;
-
--- Now apply the actual change
-${sql}`,
-          riskLevel: "LOW",
-          estimatedDuration: 60,
-          canRollback: true,
-          dependencies: [],
-          validationQueries: [],
-          onFailure: "ROLLBACK"
-        }
-      ];
-    },
-    example: {
-      before: "CREATE INDEX idx_users_email ON users(email);",
-      after: `-- Test rollback procedure
-BEGIN;
-CREATE INDEX idx_users_email ON users(email);
--- Verify change was applied
-DROP INDEX idx_users_email;
--- Verify rollback worked
-ROLLBACK;
-
--- Now apply the actual change
-CREATE INDEX idx_users_email ON users(email);`,
-      explanation: "Tests the rollback procedure before applying changes to ensure recovery is possible"
-    }
-  }
-];
-function generateRollbackSQL(sql) {
-  const sqlLower = sql.toLowerCase();
-  if (sqlLower.includes("alter table") && sqlLower.includes("add column")) {
-    const tableMatch = sql.match(/alter\s+table\s+(\w+)/i);
-    const columnMatch = sql.match(/add\s+column\s+(\w+)/i);
-    if (tableMatch && columnMatch) {
-      return `ALTER TABLE ${tableMatch[1]} DROP COLUMN ${columnMatch[1]};`;
-    }
-  }
-  if (sqlLower.includes("create index")) {
-    const indexMatch = sql.match(/create\s+index\s+(?:concurrently\s+)?(\w+)/i);
-    if (indexMatch) {
-      return `DROP INDEX ${indexMatch[1]};`;
-    }
-  }
-  if (sqlLower.includes("alter table") && sqlLower.includes("add constraint")) {
-    const tableMatch = sql.match(/alter\s+table\s+(\w+)/i);
-    const constraintMatch = sql.match(/add\s+constraint\s+(\w+)/i);
-    if (tableMatch && constraintMatch) {
-      return `ALTER TABLE ${tableMatch[1]} DROP CONSTRAINT ${constraintMatch[1]};`;
-    }
-  }
-  return "-- Manual rollback required";
-}
-function applyEnhancements(sql) {
-  const applicableRules = ENHANCEMENT_RULES.filter((rule) => rule.applies(sql));
-  if (applicableRules.length === 0) {
-    return [{
-      stepNumber: 1,
-      description: "Execute migration as-is",
-      sql,
-      riskLevel: "MEDIUM",
-      estimatedDuration: 30,
-      canRollback: true,
-      dependencies: [],
-      validationQueries: [],
-      onFailure: "ROLLBACK"
-    }];
-  }
-  const highestPriorityRule = applicableRules.reduce((prev, current) => {
-    const priorityOrder = { "CRITICAL": 4, "HIGH": 3, "MEDIUM": 2, "LOW": 1 };
-    return priorityOrder[current.priority] > priorityOrder[prev.priority] ? current : prev;
-  });
-  return highestPriorityRule.enhance(sql);
-}
-
-// src/enhancer/strategy-generator.ts
-var EnhancementStrategyGenerator = class {
-  constructor(dbConnection) {
-    this.dbConnection = dbConnection;
-    this.riskDetector = new SQLRiskDetector(dbConnection);
-  }
-  riskDetector;
-  /**
-   * Ultra-fast strategy generation using comprehensive enhancement rules
-   */
-  async generateStrategy(originalSQL, tableMetadata, options) {
-    const enhancedSteps = applyEnhancements(originalSQL);
-    const rollbackStrategy = this.generateUltraFastRollback(originalSQL, originalSQL.toLowerCase());
-    const preFlightChecks = this.generateUltraFastChecks(originalSQL, originalSQL.toLowerCase());
-    const postMigrationValidation = this.generateUltraFastValidation(originalSQL, originalSQL.toLowerCase());
-    const estimatedDuration = enhancedSteps.reduce((total, step) => total + step.estimatedDuration, 0);
-    const maintenanceWindow = {
-      recommended: estimatedDuration > 30,
-      minimumDuration: estimatedDuration,
-      optimalDuration: estimatedDuration + 60,
-      considerations: estimatedDuration > 300 ? ["Long-running operation - consider maintenance window"] : []
-    };
-    return {
-      originalSQL,
-      enhancedSteps,
-      rollbackStrategy,
-      preFlightChecks,
-      postMigrationValidation,
-      estimatedDuration,
-      maintenanceWindow,
-      dependencies: []
-    };
-  }
-  /**
-   * Generate enhanced steps using ultra-fast pattern matching
-   */
-  generateUltraFastSteps(originalSQL, sqlLower) {
-    const steps = [];
-    if (sqlLower.includes("add column") && sqlLower.includes("not null") && !sqlLower.includes("default")) {
-      const enhancedSQL = originalSQL.replace(/NOT NULL/gi, "");
-      steps.push({
-        stepNumber: 1,
-        description: "Add column as nullable first",
-        sql: enhancedSQL + ";",
-        riskLevel: "LOW",
-        estimatedDuration: 5,
-        canRollback: true,
-        dependencies: [],
-        validationQueries: [],
-        onFailure: "ROLLBACK"
-      });
-      const tableMatch = sqlLower.match(/alter\s+table\s+(\w+)/i);
-      const columnMatch = sqlLower.match(/add\s+column\s+(\w+)/i);
-      if (tableMatch && columnMatch) {
-        steps.push({
-          stepNumber: 2,
-          description: "Set default value for existing rows",
-          sql: `UPDATE ${tableMatch[1]} SET ${columnMatch[1]} = '' WHERE ${columnMatch[1]} IS NULL;`,
-          riskLevel: "MEDIUM",
-          estimatedDuration: 10,
-          canRollback: true,
-          dependencies: [],
-          validationQueries: [],
-          onFailure: "ROLLBACK"
-        });
-        steps.push({
-          stepNumber: 3,
-          description: "Add NOT NULL constraint",
-          sql: `ALTER TABLE ${tableMatch[1]} ALTER COLUMN ${columnMatch[1]} SET NOT NULL;`,
-          riskLevel: "LOW",
-          estimatedDuration: 2,
-          canRollback: true,
-          dependencies: [],
-          validationQueries: [],
-          onFailure: "ROLLBACK"
-        });
-      }
-    } else if (sqlLower.includes("create index") && !sqlLower.includes("concurrently")) {
-      const enhancedSQL = originalSQL.replace(/CREATE INDEX/gi, "CREATE INDEX CONCURRENTLY");
-      steps.push({
-        stepNumber: 1,
-        description: "Create index concurrently to avoid table locks",
-        sql: enhancedSQL,
-        riskLevel: "LOW",
-        estimatedDuration: 30,
-        canRollback: true,
-        dependencies: [],
-        validationQueries: [],
-        onFailure: "CONTINUE"
-      });
-    } else if (sqlLower.includes("add constraint")) {
-      const enhancedSQL = originalSQL.replace(/;?\s*$/, " NOT VALID;");
-      steps.push({
-        stepNumber: 1,
-        description: "Add constraint without validation",
-        sql: enhancedSQL,
-        riskLevel: "LOW",
-        estimatedDuration: 5,
-        canRollback: true,
-        dependencies: [],
-        validationQueries: [],
-        onFailure: "ROLLBACK"
-      });
-      const constraintMatch = sqlLower.match(/add\s+constraint\s+(\w+)/i);
-      const tableMatch = sqlLower.match(/alter\s+table\s+(\w+)/i);
-      if (constraintMatch && tableMatch) {
-        steps.push({
-          stepNumber: 2,
-          description: "Validate constraint separately",
-          sql: `ALTER TABLE ${tableMatch[1]} VALIDATE CONSTRAINT ${constraintMatch[1]};`,
-          riskLevel: "MEDIUM",
-          estimatedDuration: 15,
-          canRollback: true,
-          dependencies: [],
-          validationQueries: [],
-          onFailure: "CONTINUE"
-        });
-      }
-    } else {
-      steps.push({
-        stepNumber: 1,
-        description: "Execute optimized migration",
-        sql: originalSQL,
-        riskLevel: "LOW",
-        estimatedDuration: 10,
-        canRollback: true,
-        dependencies: [],
-        validationQueries: [],
-        onFailure: "ROLLBACK"
-      });
-    }
-    return steps;
-  }
-  generateUltraFastRollback(originalSQL, sqlLower) {
-    const rollbackSteps = [];
-    if (sqlLower.includes("create table")) {
-      const tableMatch = sqlLower.match(/create\s+table\s+(\w+)/i);
-      if (tableMatch) {
-        rollbackSteps.push({
-          stepNumber: 1,
-          description: "Drop created table",
-          sql: `DROP TABLE IF EXISTS ${tableMatch[1]};`
-        });
-      }
-    } else if (sqlLower.includes("add column")) {
-      const tableMatch = sqlLower.match(/alter\s+table\s+(\w+)/i);
-      const columnMatch = sqlLower.match(/add\s+column\s+(\w+)/i);
-      if (tableMatch && columnMatch) {
-        rollbackSteps.push({
-          stepNumber: 1,
-          description: "Drop added column",
-          sql: `ALTER TABLE ${tableMatch[1]} DROP COLUMN IF EXISTS ${columnMatch[1]};`
-        });
-      }
-    }
-    return {
-      canRollback: rollbackSteps.length > 0,
-      rollbackSteps,
-      dataBackupRequired: sqlLower.includes("drop"),
-      rollbackComplexity: "SIMPLE",
-      rollbackWindow: 30
-    };
-  }
-  generateUltraFastChecks(originalSQL, sqlLower) {
-    const checks = [];
-    if (sqlLower.includes("alter table")) {
-      const tableMatch = sqlLower.match(/alter\s+table\s+(\w+)/i);
-      if (tableMatch) {
-        checks.push({
-          checkName: "table_exists",
-          description: "Verify table exists before alteration",
-          query: `SELECT 1 FROM information_schema.tables WHERE table_name = '${tableMatch[1]}';`,
-          expectedResult: "has_rows",
-          onFailure: "ABORT"
-        });
-      }
-    }
-    return checks;
-  }
-  generateUltraFastValidation(originalSQL, sqlLower) {
-    const validations = [];
-    if (sqlLower.includes("create table")) {
-      const tableMatch = sqlLower.match(/create\s+table\s+(\w+)/i);
-      if (tableMatch) {
-        validations.push({
-          stepName: "verify_table_created",
-          description: "Verify table was created successfully",
-          query: `SELECT 1 FROM information_schema.tables WHERE table_name = '${tableMatch[1]}';`,
-          expectedResult: "has_rows",
-          onFailure: "WARN"
-        });
-      }
-    }
-    return validations;
-  }
-  /**
-   * Create enhanced migration steps with safety improvements
-   */
-  async createEnhancedSteps(originalSQL, riskAssessment, tableMetadata, options) {
-    const steps = [];
-    const statements = this.parseStatements(originalSQL);
-    for (let i = 0; i < statements.length; i++) {
-      const statement = statements[i];
-      const statementLower = statement.toLowerCase().trim();
-      if (statementLower.includes("alter table") && statementLower.includes("add column")) {
-        steps.push(...await this.enhanceAddColumn(statement, tableMetadata));
-      } else if (statementLower.includes("alter table") && statementLower.includes("drop column")) {
-        steps.push(...await this.enhanceDropColumn(statement, tableMetadata));
-      } else if (statementLower.includes("alter table") && statementLower.includes("add constraint")) {
-        steps.push(...await this.enhanceAddConstraint(statement, tableMetadata));
-      } else if (statementLower.includes("create index")) {
-        steps.push(...await this.enhanceCreateIndex(statement, tableMetadata));
-      } else if (statementLower.includes("drop table")) {
-        steps.push(...await this.enhanceDropTable(statement, tableMetadata));
-      } else {
-        steps.push(this.createDefaultStep(statement, i + 1));
-      }
-    }
-    return steps;
-  }
-  /**
-   * Enhance ADD COLUMN operations for safety
-   */
-  async enhanceAddColumn(statement, tableMetadata) {
-    const steps = [];
-    const statementLower = statement.toLowerCase();
-    const tableName = this.extractTableName(statementLower, "alter table");
-    if (statementLower.includes("not null") && !statementLower.includes("default")) {
-      const columnName = this.extractColumnName(statement);
-      const columnType = this.extractColumnType(statement);
-      steps.push({
-        stepNumber: 1,
-        description: `Add column ${columnName} as nullable to table ${tableName}`,
-        sql: statement.replace(/not null/gi, "").trim(),
-        riskLevel: "LOW",
-        estimatedDuration: 5,
-        canRollback: true,
-        dependencies: [],
-        validationQueries: [
-          `SELECT COUNT(*) FROM information_schema.columns WHERE table_name = '${tableName}' AND column_name = '${columnName}'`
-        ],
-        onFailure: "STOP"
-      });
-      steps.push({
-        stepNumber: 2,
-        description: `Update NULL values in ${columnName} with appropriate defaults`,
-        sql: `UPDATE ${tableName} SET ${columnName} = [SPECIFY_DEFAULT_VALUE] WHERE ${columnName} IS NULL;`,
-        riskLevel: "MEDIUM",
-        estimatedDuration: 30,
-        canRollback: true,
-        dependencies: ["Step 1"],
-        validationQueries: [
-          `SELECT COUNT(*) FROM ${tableName} WHERE ${columnName} IS NULL`
-        ],
-        onFailure: "ROLLBACK"
-      });
-      steps.push({
-        stepNumber: 3,
-        description: `Add NOT NULL constraint to column ${columnName}`,
-        sql: `ALTER TABLE ${tableName} ALTER COLUMN ${columnName} SET NOT NULL;`,
-        riskLevel: "MEDIUM",
-        estimatedDuration: 10,
-        canRollback: true,
-        dependencies: ["Step 2"],
-        validationQueries: [
-          `SELECT is_nullable FROM information_schema.columns WHERE table_name = '${tableName}' AND column_name = '${columnName}'`
-        ],
-        onFailure: "ROLLBACK"
-      });
-    } else {
-      steps.push({
-        stepNumber: 1,
-        description: `Add column to table ${tableName}`,
-        sql: statement,
-        riskLevel: "LOW",
-        estimatedDuration: 5,
-        canRollback: true,
-        dependencies: [],
-        validationQueries: [
-          `SELECT COUNT(*) FROM information_schema.columns WHERE table_name = '${tableName}'`
-        ],
-        onFailure: "STOP"
-      });
-    }
-    return steps;
-  }
-  /**
-   * Enhance DROP COLUMN operations for safety
-   */
-  async enhanceDropColumn(statement, tableMetadata) {
-    const steps = [];
-    const statementLower = statement.toLowerCase();
-    const tableName = this.extractTableName(statementLower, "alter table");
-    const columnName = this.extractColumnName(statement);
-    steps.push({
-      stepNumber: 1,
-      description: `Create backup table with column data before dropping ${columnName}`,
-      sql: `CREATE TABLE ${tableName}_${columnName}_backup AS SELECT id, ${columnName} FROM ${tableName};`,
-      riskLevel: "LOW",
-      estimatedDuration: 30,
-      canRollback: true,
-      dependencies: [],
-      validationQueries: [
-        `SELECT COUNT(*) FROM ${tableName}_${columnName}_backup`
-      ],
-      onFailure: "STOP"
-    });
-    steps.push({
-      stepNumber: 2,
-      description: `Drop column ${columnName} from table ${tableName}`,
-      sql: statement,
-      riskLevel: "HIGH",
-      estimatedDuration: 60,
-      canRollback: false,
-      // Dropping column is not easily reversible
-      dependencies: ["Step 1"],
-      validationQueries: [
-        `SELECT COUNT(*) FROM information_schema.columns WHERE table_name = '${tableName}' AND column_name = '${columnName}'`
-      ],
-      onFailure: "STOP"
-    });
-    return steps;
-  }
-  /**
-   * Enhance ADD CONSTRAINT operations for safety
-   */
-  async enhanceAddConstraint(statement, tableMetadata) {
-    const steps = [];
-    const statementLower = statement.toLowerCase();
-    const tableName = this.extractTableName(statementLower, "alter table");
-    if (statementLower.includes("foreign key")) {
-      steps.push({
-        stepNumber: 1,
-        description: `Validate referential integrity before adding foreign key constraint`,
-        sql: `-- Custom validation query will be generated based on constraint details`,
-        riskLevel: "MEDIUM",
-        estimatedDuration: 60,
-        canRollback: true,
-        dependencies: [],
-        validationQueries: [
-          `-- Validate no orphaned records exist`
-        ],
-        onFailure: "STOP"
-      });
-      steps.push({
-        stepNumber: 2,
-        description: `Add foreign key constraint to table ${tableName}`,
-        sql: statement,
-        riskLevel: "HIGH",
-        estimatedDuration: 120,
-        canRollback: true,
-        dependencies: ["Step 1"],
-        validationQueries: [
-          `SELECT COUNT(*) FROM information_schema.table_constraints WHERE table_name = '${tableName}' AND constraint_type = 'FOREIGN KEY'`
-        ],
-        onFailure: "ROLLBACK"
-      });
-    } else if (statementLower.includes("unique")) {
-      steps.push({
-        stepNumber: 1,
-        description: `Check for duplicate values before adding unique constraint`,
-        sql: `-- Custom duplicate check query`,
-        riskLevel: "MEDIUM",
-        estimatedDuration: 30,
-        canRollback: true,
-        dependencies: [],
-        validationQueries: [
-          `-- Check for duplicates in target columns`
-        ],
-        onFailure: "STOP"
-      });
-      steps.push({
-        stepNumber: 2,
-        description: `Add unique constraint to table ${tableName}`,
-        sql: statement,
-        riskLevel: "MEDIUM",
-        estimatedDuration: 60,
-        canRollback: true,
-        dependencies: ["Step 1"],
-        validationQueries: [
-          `SELECT COUNT(*) FROM information_schema.table_constraints WHERE table_name = '${tableName}' AND constraint_type = 'UNIQUE'`
-        ],
-        onFailure: "ROLLBACK"
-      });
-    } else {
-      steps.push({
-        stepNumber: 1,
-        description: `Add constraint to table ${tableName}`,
-        sql: statement,
-        riskLevel: "MEDIUM",
-        estimatedDuration: 30,
-        canRollback: true,
-        dependencies: [],
-        validationQueries: [],
-        onFailure: "ROLLBACK"
-      });
-    }
-    return steps;
-  }
-  /**
-   * Enhance CREATE INDEX operations for safety
-   */
-  async enhanceCreateIndex(statement, tableMetadata) {
-    const steps = [];
-    const statementLower = statement.toLowerCase();
-    const tableName = this.extractTableName(statementLower, "on");
-    if (this.dbConnection.type === "postgresql" && !statementLower.includes("concurrently")) {
-      const enhancedSQL = statement.replace(/create index/i, "CREATE INDEX CONCURRENTLY");
-      steps.push({
-        stepNumber: 1,
-        description: `Create index concurrently on table ${tableName} to avoid blocking writes`,
-        sql: enhancedSQL,
-        riskLevel: "LOW",
-        estimatedDuration: 300,
-        // Longer but non-blocking
-        canRollback: true,
-        dependencies: [],
-        validationQueries: [
-          `SELECT COUNT(*) FROM pg_indexes WHERE tablename = '${tableName}'`
-        ],
-        onFailure: "ROLLBACK"
-      });
-    } else {
-      steps.push({
-        stepNumber: 1,
-        description: `Create index on table ${tableName}`,
-        sql: statement,
-        riskLevel: "MEDIUM",
-        estimatedDuration: 180,
-        canRollback: true,
-        dependencies: [],
-        validationQueries: [],
-        onFailure: "ROLLBACK"
-      });
-    }
-    return steps;
-  }
-  /**
-   * Enhance DROP TABLE operations for safety
-   */
-  async enhanceDropTable(statement, tableMetadata) {
-    const steps = [];
-    const tableName = this.extractTableName(statement.toLowerCase(), "drop table");
-    steps.push({
-      stepNumber: 1,
-      description: `Create backup of table ${tableName} before dropping`,
-      sql: `CREATE TABLE ${tableName}_backup_${Date.now()} AS SELECT * FROM ${tableName};`,
-      riskLevel: "LOW",
-      estimatedDuration: 120,
-      canRollback: true,
-      dependencies: [],
-      validationQueries: [
-        `SELECT COUNT(*) FROM ${tableName}_backup_${Date.now()}`
-      ],
-      onFailure: "STOP"
-    });
-    steps.push({
-      stepNumber: 2,
-      description: `Drop table ${tableName}`,
-      sql: statement,
-      riskLevel: "CRITICAL",
-      estimatedDuration: 30,
-      canRollback: false,
-      // Table drop is irreversible without backup
-      dependencies: ["Step 1"],
-      validationQueries: [
-        `SELECT COUNT(*) FROM information_schema.tables WHERE table_name = '${tableName}'`
-      ],
-      onFailure: "STOP"
-    });
-    return steps;
-  }
-  /**
-   * Create default migration step for unhandled operations
-   */
-  createDefaultStep(statement, stepNumber) {
-    return {
-      stepNumber,
-      description: `Execute: ${statement.substring(0, 50)}${statement.length > 50 ? "..." : ""}`,
-      sql: statement,
-      riskLevel: "MEDIUM",
-      estimatedDuration: 30,
-      canRollback: true,
-      dependencies: [],
-      validationQueries: [],
-      onFailure: "STOP"
-    };
-  }
-  /**
-   * Create rollback strategy for the migration
-   */
-  createRollbackStrategy(steps, riskAssessment) {
-    const rollbackSteps = [];
-    let canRollback = true;
-    let rollbackComplexity = "SIMPLE";
-    let dataBackupRequired = false;
-    for (let i = steps.length - 1; i >= 0; i--) {
-      const step = steps[i];
-      if (!step.canRollback) {
-        canRollback = false;
-        rollbackComplexity = "IMPOSSIBLE";
-        break;
-      }
-      if (step.riskLevel === "HIGH" || step.riskLevel === "CRITICAL") {
-        rollbackComplexity = "COMPLEX";
-        dataBackupRequired = true;
-      }
-      const rollbackSQL = this.generateRollbackSQL(step);
-      if (rollbackSQL) {
-        rollbackSteps.push({
-          stepNumber: rollbackSteps.length + 1,
-          description: `Rollback: ${step.description}`,
-          sql: rollbackSQL,
-          condition: `IF step ${step.stepNumber} was executed`
-        });
-      }
-    }
-    const rollbackWindow = rollbackSteps.reduce((total, step) => total + 30, 0);
-    return {
-      canRollback,
-      rollbackSteps,
-      dataBackupRequired,
-      rollbackComplexity,
-      rollbackWindow
-    };
-  }
-  /**
-   * Generate appropriate rollback SQL for a migration step
-   */
-  generateRollbackSQL(step) {
-    const sql = step.sql.toLowerCase().trim();
-    if (sql.includes("alter table") && sql.includes("add column")) {
-      const tableName = this.extractTableName(sql, "alter table");
-      const columnName = this.extractColumnName(step.sql);
-      return `ALTER TABLE ${tableName} DROP COLUMN ${columnName};`;
-    }
-    if (sql.includes("create index")) {
-      const indexName = this.extractIndexName(step.sql);
-      return `DROP INDEX ${indexName};`;
-    }
-    if (sql.includes("alter table") && sql.includes("add constraint")) {
-      const tableName = this.extractTableName(sql, "alter table");
-      const constraintName = this.extractConstraintName(step.sql);
-      return `ALTER TABLE ${tableName} DROP CONSTRAINT ${constraintName};`;
-    }
-    return `-- Manual rollback required for: ${step.description}`;
-  }
-  /**
-   * Create pre-flight validation checks
-   */
-  async createPreFlightChecks(originalSQL, tableMetadata) {
-    const checks = [];
-    const statementLower = originalSQL.toLowerCase();
-    if (statementLower.includes("alter table")) {
-      const tableName = this.extractTableName(statementLower, "alter table");
-      checks.push({
-        checkName: "table_exists",
-        description: `Verify table ${tableName} exists`,
-        query: `SELECT COUNT(*) FROM information_schema.tables WHERE table_name = '${tableName}'`,
-        expectedResult: "SPECIFIC_VALUE",
-        expectedValue: 1,
-        failureAction: "BLOCK"
-      });
-    }
-    checks.push({
-      checkName: "disk_space",
-      description: "Verify sufficient disk space for migration",
-      query: `-- Database-specific disk space query`,
-      expectedResult: "CUSTOM",
-      failureAction: "WARN",
-      customValidation: (result) => {
-        return { success: true, message: "Sufficient disk space available" };
-      }
-    });
-    checks.push({
-      checkName: "active_connections",
-      description: "Check for excessive active connections",
-      query: `-- Database-specific connection count query`,
-      expectedResult: "CUSTOM",
-      failureAction: "WARN",
-      customValidation: (result) => {
-        return { success: true, message: "Connection count is acceptable" };
-      }
-    });
-    return checks;
-  }
-  /**
-   * Create post-migration validation steps
-   */
-  createValidationSteps(originalSQL, tableMetadata) {
-    const validations = [];
-    const statementLower = originalSQL.toLowerCase();
-    if (statementLower.includes("alter table") && statementLower.includes("add column")) {
-      const tableName = this.extractTableName(statementLower, "alter table");
-      const columnName = this.extractColumnName(originalSQL);
-      validations.push({
-        stepName: "column_added",
-        description: `Verify column ${columnName} was added to table ${tableName}`,
-        query: `SELECT COUNT(*) FROM information_schema.columns WHERE table_name = '${tableName}' AND column_name = '${columnName}'`,
-        expectedCondition: "COUNT = 1",
-        isRequired: true
-      });
-    }
-    if (statementLower.includes("create index")) {
-      const indexName = this.extractIndexName(originalSQL);
-      validations.push({
-        stepName: "index_created",
-        description: `Verify index ${indexName} was created`,
-        query: `-- Database-specific index existence query`,
-        expectedCondition: "INDEX EXISTS",
-        isRequired: true
-      });
-    }
-    return validations;
-  }
-  /**
-   * Calculate maintenance window requirements
-   */
-  calculateMaintenanceWindow(steps, riskAssessment) {
-    const totalDuration = steps.reduce((sum, step) => sum + step.estimatedDuration, 0);
-    const hasHighRisk = steps.some((step) => step.riskLevel === "HIGH" || step.riskLevel === "CRITICAL");
-    const hasBlockingOperations = riskAssessment.riskCategories.some((cat) => cat.type === "BLOCKING");
-    const recommended = hasHighRisk || hasBlockingOperations || totalDuration > 300;
-    const minimumDuration = totalDuration;
-    const optimalDuration = Math.ceil(totalDuration * 1.5);
-    const considerations = [];
-    if (hasBlockingOperations) {
-      considerations.push("Migration includes blocking operations that will lock tables");
-    }
-    if (hasHighRisk) {
-      considerations.push("High-risk operations require careful monitoring");
-    }
-    if (totalDuration > 600) {
-      considerations.push("Long-running migration may impact performance");
-    }
-    return {
-      recommended,
-      minimumDuration,
-      optimalDuration,
-      considerations
-    };
-  }
-  /**
-   * Extract dependencies from migration steps
-   */
-  extractDependencies(steps) {
-    const dependencies = /* @__PURE__ */ new Set();
-    steps.forEach((step) => {
-      step.dependencies.forEach((dep) => dependencies.add(dep));
-    });
-    return Array.from(dependencies);
-  }
-  // Helper methods for SQL parsing
-  parseStatements(sql) {
-    return sql.split(";").map((stmt) => stmt.trim()).filter((stmt) => stmt.length > 0);
-  }
-  extractTableName(statement, afterKeyword) {
-    const regex = new RegExp(`${afterKeyword}\\s+([\\w\\-_\\.]+)`, "i");
-    const match = statement.match(regex);
-    return match ? match[1] : null;
-  }
-  extractColumnName(statement) {
-    const addColumnMatch = statement.match(/add\s+column\s+([^\s]+)/i);
-    const dropColumnMatch = statement.match(/drop\s+column\s+([^\s]+)/i);
-    return addColumnMatch?.[1] || dropColumnMatch?.[1] || null;
-  }
-  extractColumnType(statement) {
-    const match = statement.match(/add\s+column\s+\w+\s+([^\s,]+)/i);
-    return match ? match[1] : null;
-  }
-  extractIndexName(statement) {
-    const match = statement.match(/create\s+index\s+([^\s]+)/i);
-    return match ? match[1] : null;
-  }
-  extractConstraintName(statement) {
-    const match = statement.match(/constraint\s+([^\s]+)/i);
-    return match ? match[1] : null;
-  }
-};
-
-// src/enhancer/enhancement-engine.ts
-var EnhancementEngine = class {
-  risk = new SQLRiskDetector();
-  generator = new EnhancementStrategyGenerator({});
-  enhancementCache = /* @__PURE__ */ new Map();
-  /**
-   * Ultra-fast migration analysis with aggressive caching and optimization
-   */
-  async enhance(migration) {
-    const cacheKey = this.generateCacheKey(migration.up);
-    if (this.enhancementCache.has(cacheKey)) {
-      const cached = this.enhancementCache.get(cacheKey);
-      return {
-        ...cached,
-        original: migration
-        // Update original reference
-      };
-    }
-    const [riskReport, strategy] = await Promise.all([
-      this.risk.analyzeSQL(migration.up),
-      this.generator.generateStrategy(migration.up)
-    ]);
-    const enhanced = {
-      original: migration,
-      enhanced: {
-        up: strategy.enhancedSteps.map((s) => s.sql).join("\n"),
-        down: strategy.rollbackStrategy.rollbackSteps.map((s) => s.sql).join("\n"),
-        preFlightChecks: strategy.preFlightChecks.map((c) => c.query),
-        postMigrationValidation: strategy.postMigrationValidation.map((v) => v.query),
-        rollbackStrategy: strategy.rollbackStrategy.rollbackSteps.map((s) => s.sql)
-      },
-      estimatedDuration: strategy.estimatedDuration
-    };
-    this.enhancementCache.set(cacheKey, enhanced);
-    return enhanced;
-  }
-  /**
-   * Generate ultra-fast cache key using simple hash
-   */
-  generateCacheKey(sql) {
-    let hash = 0;
-    for (let i = 0; i < sql.length; i++) {
-      const char = sql.charCodeAt(i);
-      hash = (hash << 5) - hash + char;
-      hash = hash & hash;
-    }
-    return hash.toString(36);
-  }
-  /**
-   * Clear cache if needed
-   */
-  clearCache() {
-    this.enhancementCache.clear();
-  }
-};
-
-// src/commands/sync.ts
-import fs6 from "fs-extra";
-import path4 from "path";
-import { diffChars } from "diff";
-import pc from "picocolors";
-import { execa } from "execa";
-async function syncCommand(options, globalOptions) {
-  console.log();
-  console.log(pc.cyan("\u{1F30A} DriftJS Flow - Sync"));
-  console.log();
-  const projectPath = options.project ? path4.resolve(options.project) : process.cwd();
+// src/commands/status.ts
+var status_exports = {};
+__export(status_exports, {
+  statusCommand: () => statusCommand
+});
+import { intro as intro5, outro as outro5 } from "@clack/prompts";
+import fs10 from "fs-extra";
+import path8 from "path";
+import pc6 from "picocolors";
+async function statusCommand(options, globalOptions) {
+  const projectPath = options.project ? path8.resolve(options.project) : process.cwd();
   const cfg = await getFlowConfig(globalOptions, projectPath);
   const envCfg = cfg.environments[cfg.defaultEnvironment];
-  const spinner3 = createSpinner("Detecting ORM setup...");
-  let detectedORM = null;
-  const detectors = [
-    { name: "prisma", detector: new PrismaDetector() },
-    { name: "drizzle", detector: new DrizzleDetector() },
-    { name: "typeorm", detector: new TypeORMDetector() }
-  ];
-  if (options.orm && options.orm !== "auto") {
-    detectedORM = options.orm;
-    spinner3.succeed(`Using specified ORM: ${pc.green(detectedORM)}`);
-  } else {
-    for (const { name, detector: detector2 } of detectors) {
-      const result = await detector2.detect(projectPath);
-      if (result.found) {
-        detectedORM = name;
-        break;
-      }
-    }
-    if (detectedORM) {
-      spinner3.succeed(`Detected ORM: ${pc.green(detectedORM.toUpperCase())}`);
-    } else {
-      spinner3.fail("No ORM detected");
-      console.log();
-      console.log(pc.red("\u2717 No supported ORM found"));
-      console.log(pc.gray("  Supported ORMs: Prisma, Drizzle, TypeORM"));
-      console.log(pc.gray("  Make sure you have a valid ORM configuration in your project"));
-      return;
-    }
-  }
-  const detector = detectors.find((d) => d.name === detectedORM)?.detector;
-  if (!detector) {
-    console.log(pc.red("\u2717 Detector initialization failed"));
-    return;
-  }
-  const ormConfig = await detector.extractConfig(projectPath);
-  const analysisSpinner = createSpinner("Analyzing schema changes...");
-  const hasChanges = await checkForSchemaChanges(detectedORM, ormConfig, projectPath);
-  if (!hasChanges && !options.force) {
-    analysisSpinner.succeed("Schema analysis complete");
-    console.log();
-    console.log(pc.green("\u2713 No pending schema changes detected"));
-    console.log(pc.gray("  Your migrations are up to date"));
-    console.log(pc.gray("  Use --force to re-analyze existing migrations"));
-    return;
-  }
-  analysisSpinner.succeed("Schema analysis complete");
-  const migrationsDir = envCfg.migrationsPath || ormConfig?.migrationDirectory?.relative || "./migrations";
-  const absoluteMigrationsDir = path4.resolve(projectPath, migrationsDir);
-  if (hasChanges) {
-    console.log();
-    console.log(pc.yellow("\u26A0 Schema changes detected - generating migration..."));
-    await handleSchemaChanges(detectedORM, ormConfig, absoluteMigrationsDir, globalOptions, projectPath, options);
-  }
-  console.log();
-  await enhanceExistingMigrations(absoluteMigrationsDir, globalOptions, options);
-  console.log();
-  console.log(pc.green("\u2713 Sync completed successfully"));
-}
-async function checkForSchemaChanges(orm, config, projectPath) {
-  switch (orm) {
-    case "prisma":
-      return await checkPrismaChanges(config, projectPath);
-    case "drizzle":
-      return await checkDrizzleChanges(config, projectPath);
-    case "typeorm":
-      return await checkTypeORMChanges(config, projectPath);
-    default:
-      return false;
-  }
-}
-async function checkPrismaChanges(config, projectPath) {
-  try {
-    const schemaPath = path4.join(projectPath, "prisma", "schema.prisma");
-    const migrationsPath = path4.join(projectPath, "prisma", "migrations");
-    if (!await fs6.pathExists(schemaPath)) return false;
-    if (!await fs6.pathExists(migrationsPath)) return true;
-    try {
-      await execa("npx prisma migrate status", { cwd: projectPath });
-      try {
-        const { stdout } = await execa("npx prisma migrate diff --from-migrations ./prisma/migrations --to-schema-datamodel ./prisma/schema.prisma", { cwd: projectPath });
-        return stdout.trim().length > 0;
-      } catch {
-        return true;
-      }
-    } catch {
-      const schemaStats = await fs6.stat(schemaPath);
-      const migrationFiles = await fs6.readdir(migrationsPath);
-      if (migrationFiles.length === 0) return true;
-      const migrationDirs = migrationFiles.filter((file) => file.match(/^\d{14}_/));
-      if (migrationDirs.length === 0) return true;
-      const latestMigration = migrationDirs.sort().pop();
-      const latestMigrationPath = path4.join(migrationsPath, latestMigration);
-      const migrationStats = await fs6.stat(latestMigrationPath);
-      return schemaStats.mtime > migrationStats.mtime;
-    }
-  } catch (error) {
-    return false;
-  }
-}
-async function checkDrizzleChanges(config, projectPath) {
-  return true;
-}
-async function checkTypeORMChanges(config, projectPath) {
-  try {
-    try {
-      const { stdout } = await execa("npx typeorm migration:show", { cwd: projectPath });
-      return !stdout.includes("No migrations are pending");
-    } catch {
-      const entityDirs = ["src/entities", "src/entity", "entities"];
-      const migrationsDir = config?.migrationDirectory || "./src/migrations";
-      const migrationsDirPath = path4.join(projectPath, migrationsDir);
-      if (!await fs6.pathExists(migrationsDirPath)) return true;
-      for (const entityDir of entityDirs) {
-        const entityDirPath = path4.join(projectPath, entityDir);
-        if (await fs6.pathExists(entityDirPath)) {
-          const entityFiles = await fs6.readdir(entityDirPath);
-          const tsFiles = entityFiles.filter((f) => f.endsWith(".ts") || f.endsWith(".js"));
-          for (const entityFile of tsFiles) {
-            const entityPath = path4.join(entityDirPath, entityFile);
-            const entityStats = await fs6.stat(entityPath);
-            const migrationFiles = await fs6.readdir(migrationsDirPath);
-            if (migrationFiles.length === 0) return true;
-            const latestMigration = migrationFiles.sort().pop();
-            const latestMigrationPath = path4.join(migrationsDirPath, latestMigration);
-            const migrationStats = await fs6.stat(latestMigrationPath);
-            if (entityStats.mtime > migrationStats.mtime) {
-              return true;
-            }
-          }
-        }
-      }
-      return false;
-    }
-  } catch (error) {
-    return false;
-  }
-}
-async function handleSchemaChanges(orm, config, migrationsDir, globalOptions, projectPath, options) {
-  const migrationName = `flow_change_${Date.now()}`;
-  let generateCmd = "";
-  let workingDir = projectPath;
-  switch (orm) {
-    case "prisma":
-      generateCmd = `npx prisma migrate dev --name ${migrationName}`;
-      break;
-    case "drizzle":
-      if (config?.configFile?.absolute) {
-        workingDir = path4.dirname(config.configFile.absolute);
-        generateCmd = `npx drizzle-kit generate`;
-      } else {
-        generateCmd = `npx drizzle-kit generate`;
-      }
-      break;
-    case "typeorm":
-      const migPath = path4.join(migrationsDir, migrationName);
-      generateCmd = `npx typeorm migration:generate ${migPath}`;
-      break;
-  }
-  const spinner3 = createSpinner("Generating migration...");
-  try {
-    const { stdout, stderr } = await execa(generateCmd, { cwd: workingDir, shell: true });
-    if (globalOptions.debug) {
-      console.log(stdout);
-      if (stderr) console.error(pc.yellow(stderr));
-    }
-    spinner3.succeed("Migration generated successfully");
-  } catch (error) {
-    spinner3.fail("Migration generation failed");
-    console.log();
-    console.log(pc.red("\u2717 Failed to generate migration"));
-    console.log(pc.gray(`  Error: ${error.stderr || error.message}`));
-    console.log();
-    console.log(pc.yellow("\u26A0 Please run this command manually:"));
-    console.log(pc.cyan(`  ${generateCmd}`));
-    return;
-  }
-}
-async function enhanceExistingMigrations(migrationsDir, globalOptions, options) {
-  const spinner3 = createSpinner("Analyzing migrations...");
-  if (!await fs6.pathExists(migrationsDir)) {
-    spinner3.fail("Migrations directory not found");
-    console.log();
-    console.log(pc.red("\u2717 Migrations directory not found"));
-    console.log(pc.gray(`  Looking for: ${migrationsDir}`));
-    return;
-  }
-  const files = await fs6.readdir(migrationsDir);
-  const migrationFiles = files.filter((file) => file.endsWith(".sql") || file.endsWith(".ts") || file.endsWith(".js"));
-  if (migrationFiles.length === 0) {
-    spinner3.succeed("Analysis complete");
-    console.log();
-    console.log(pc.gray("\u2022 No migration files found to analyze"));
-    return;
-  }
-  spinner3.succeed(`Found ${migrationFiles.length} migration file(s)`);
-  const engine = new EnhancementEngine();
-  const analysisSpinner = createSpinner("Analyzing enhancement opportunities...");
-  const fileReads = await Promise.all(
-    migrationFiles.map(async (file) => {
-      const filePath = path4.join(migrationsDir, file);
-      const content = await fs6.readFile(filePath, "utf-8");
-      const sql = extractSQLFromMigrationFile(content);
-      return {
-        file,
-        filePath,
-        content,
-        sql,
-        migrationFile: {
-          path: filePath,
-          name: file,
-          up: sql,
-          down: "",
-          timestamp: /* @__PURE__ */ new Date(),
-          operations: [],
-          checksum: ""
-        }
-      };
-    })
-  );
-  const analyses = await Promise.all(
-    fileReads.map(async ({ file, filePath, content, sql, migrationFile }) => {
-      const enhanced = await engine.enhance(migrationFile);
-      return {
-        file,
-        filePath,
-        content,
-        sql,
-        enhanced,
-        hasChanges: enhanced.original.up !== enhanced.enhanced.up
-      };
-    })
-  );
-  analysisSpinner.succeed("Enhancement analysis complete");
-  let changesApplied = 0;
-  const enhancementsFound = analyses.filter((a) => a.hasChanges);
-  if (enhancementsFound.length === 0) {
-    console.log();
-    console.log(pc.gray("\u2022 No enhancements needed - migrations are already optimized"));
-    return;
-  }
-  console.log();
-  console.log(pc.blue(`Found ${enhancementsFound.length} migration(s) that can be enhanced:`));
-  for (const analysis of enhancementsFound) {
-    console.log();
-    console.log(pc.bold(`\u{1F4C4} ${analysis.file}`));
-    const diff = diffChars(analysis.enhanced.original.up, analysis.enhanced.enhanced.up);
-    let hasAdditions = false;
-    let hasRemovals = false;
-    diff.forEach((part) => {
-      if (part.added) hasAdditions = true;
-      if (part.removed) hasRemovals = true;
-    });
-    if (hasAdditions || hasRemovals) {
-      console.log();
-      diff.forEach((part) => {
-        if (part.added) {
-          const lines = part.value.split("\n").filter((line) => line.trim());
-          lines.forEach((line) => {
-            if (line.trim()) {
-              console.log(pc.green(`+ ${line.trim()}`));
-            }
-          });
-        } else if (part.removed) {
-          const lines = part.value.split("\n").filter((line) => line.trim());
-          lines.forEach((line) => {
-            if (line.trim()) {
-              console.log(pc.red(`- ${line.trim()}`));
-            }
-          });
-        }
-      });
-    }
-    const proceed = options.yes ? true : await confirm2({
-      message: `Apply enhancements to ${analysis.file}?`,
-      initialValue: true
-    });
-    if (proceed) {
-      try {
-        const newContent = await replaceEnhancedSQLInMigrationFile(
-          analysis.filePath,
-          analysis.enhanced.enhanced.up,
-          analysis.enhanced.enhanced.down
-        );
-        await fs6.writeFile(analysis.filePath, newContent, "utf-8");
-        console.log(pc.green(`\u2713 Enhanced ${analysis.file}`));
-        changesApplied++;
-      } catch (error) {
-        console.log(pc.yellow(`\u26A0 Could not automatically enhance ${analysis.file}`));
-        console.log(pc.gray(`  Error: ${error}`));
-      }
-    } else {
-      console.log(pc.gray(`\u2022 Skipped ${analysis.file}`));
-    }
-  }
-  if (changesApplied > 0) {
-    console.log();
-    console.log(pc.green(`\u2713 Applied ${changesApplied} enhancement(s) to migration files`));
-  }
-}
-function extractSQLFromMigrationFile(content) {
-  const sqlPatterns = [
-    /queryRunner\.query\s*\(\s*[`"']([^`"']+)[`"']/g,
-    /sql\s*`([^`]+)`/g,
-    /"((?:CREATE|ALTER|DROP|INSERT|UPDATE|DELETE)[^"]+)"/gi
-  ];
-  let extractedSQL = "";
-  for (const pattern of sqlPatterns) {
-    let match;
-    while ((match = pattern.exec(content)) !== null) {
-      extractedSQL += match[1] + ";\n";
-    }
-  }
-  return extractedSQL || content;
-}
-async function replaceEnhancedSQLInMigrationFile(filePath, upSQL, downSQL) {
-  const content = await fs6.readFile(filePath, "utf-8");
-  let updatedContent = content;
-  const fileName = path4.basename(filePath);
-  const enhancementComment = generateEnhancementComment(fileName, upSQL);
-  if (!updatedContent.includes("Enhanced by DriftJS")) {
-    const lines = updatedContent.split("\n");
-    let insertIndex = 0;
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i].trim();
-      if (line && !line.startsWith("//") && !line.startsWith("/*") && !line.startsWith("*") && !line.startsWith("import") && !line.startsWith("export")) {
-        insertIndex = i;
-        break;
-      }
-    }
-    lines.splice(insertIndex, 0, enhancementComment, "");
-    updatedContent = lines.join("\n");
-  }
-  updatedContent = updatedContent.replace(/queryRunner\.query\s*\(\s*[`"']([^`"']+)[`"']/g, `queryRunner.query(\`${upSQL.trim()}\`)`);
-  updatedContent = updatedContent.replace(/sql\s*`([^`]+)`/g, `sql\`${upSQL.trim()}\``);
-  updatedContent = updatedContent.replace(/"((?:CREATE|ALTER|DROP|INSERT|UPDATE|DELETE)[^"]+)"/gi, `"${upSQL.trim()}"`);
-  if (downSQL) {
-    updatedContent = updatedContent.replace(/(public async down\(.*?\): Promise<void> \{[\s\S]*?queryRunner\.query\s*\(\s*[`"'])([^`"']+)([`"'])/, `$1${downSQL.trim()}$3`);
-  }
-  return updatedContent;
-}
-function generateEnhancementComment(fileName, enhancedSQL) {
-  const timestamp = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
-  const operations = analyzeEnhancements(enhancedSQL);
-  const header = `/*
- * Migration Enhanced by DriftJS.com
- * File: ${fileName}
- * Enhanced: ${timestamp}
- * 
- * This migration has been optimized for production safety and performance.
- * Learn more at https://driftjs.com
- */`;
-  if (operations.length === 1) {
-    return `${header.slice(0, -2)}
- * 
- * Enhancement: ${operations[0]}
- */`;
-  } else if (operations.length > 1) {
-    const enhancementList = operations.map((op) => ` * - ${op}`).join("\n");
-    return `${header.slice(0, -2)}
- * 
- * Enhancements Applied:
-${enhancementList}
- */`;
-  }
-  return header;
-}
-function analyzeEnhancements(sql) {
-  const enhancements = [];
-  const sqlLower = sql.toLowerCase();
-  if (sqlLower.includes("add constraint") && sqlLower.includes("not valid")) {
-    enhancements.push("Safe constraint addition with NOT VALID optimization");
-  }
-  if (sqlLower.includes("concurrently")) {
-    enhancements.push("Non-blocking concurrent index creation");
-  }
-  if (sqlLower.includes("backup") || sqlLower.includes("copy")) {
-    enhancements.push("Data backup created before destructive operations");
-  }
-  if (sqlLower.includes("alter table") && sqlLower.includes("add column") && !sqlLower.includes("not null")) {
-    enhancements.push("Nullable column added first for safe NOT NULL migration");
-  }
-  if (sqlLower.includes("validate constraint")) {
-    enhancements.push("Constraint validation separated for reduced downtime");
-  }
-  if (sqlLower.includes("lock timeout") || sqlLower.includes("statement_timeout")) {
-    enhancements.push("Query timeouts configured to prevent long locks");
-  }
-  if (sqlLower.includes("begin;") && sqlLower.includes("commit;")) {
-    enhancements.push("Transaction boundaries optimized for safety");
-  }
-  if (enhancements.length === 0) {
-    enhancements.push("Production-ready migration optimizations applied");
-  }
-  return enhancements;
-}
-
-// src/commands/test.ts
-import { spinner as spinner2 } from "@clack/prompts";
-import path5 from "path";
-async function testCommand(options, globalOptions) {
-  const s = spinner2();
-  const projectPath = options.project ? path5.resolve(options.project) : process.cwd();
-  const cfg = await getFlowConfig(globalOptions, projectPath);
-  if (globalOptions.debug) {
-    console.log("Testing migrations against env:", cfg.defaultEnvironment);
-  }
-  s.start("Running migration tests...");
-  await new Promise((resolve4) => setTimeout(resolve4, 2e3));
-  s.stop("Safety tests completed");
-  console.log("\u2705 All safety checks passed");
-}
-
-// src/commands/apply.ts
-import { confirm as confirm3 } from "@clack/prompts";
-import fs7 from "fs-extra";
-import path6 from "path";
-import pc2 from "picocolors";
-import { Client as PgClient } from "pg";
-import mysql from "mysql2/promise";
-import Database from "better-sqlite3";
-async function applyCommand(options, globalOptions) {
-  const projectPath = options.project ? path6.resolve(options.project) : process.cwd();
-  const cfg = await getFlowConfig(globalOptions, projectPath);
-  const envCfg = cfg.environments[cfg.defaultEnvironment];
-  if (globalOptions.debug) {
-    console.log("Applying migration using env:", cfg.defaultEnvironment);
-  }
-  const spinner3 = createSpinner("Connecting to database...");
-  let connection = null;
-  try {
-    console.log("connecting to database...");
-    connection = await connectToDatabase(envCfg);
-    console.log("connected to database");
-    spinner3.update("Connected to database successfully");
-  } catch (error) {
-    console.log("error connecting to database", error);
-    spinner3.fail("Failed to connect to database");
-    console.log(pc2.red(`\u274C Database connection failed: ${error}`));
-    return;
-  }
-  try {
-    spinner3.update("Ensuring migration tracking table exists...");
-    await ensureMigrationsTable(connection);
-    console.log("ensured migrations table");
-    spinner3.update("Finding migrations to apply...");
-    const migrationsDir = envCfg.migrationsPath || "./migrations";
-    const absoluteMigrationsDir = path6.resolve(projectPath, migrationsDir);
-    const pendingMigrations = await findPendingMigrations(connection, absoluteMigrationsDir, options.migration);
-    console.log("found pending migrations");
-    if (pendingMigrations.length === 0) {
-      spinner3.succeed("No pending migrations to apply");
-      console.log(pc2.green("\u2705 Database is up to date"));
-      return;
-    }
-    spinner3.stop();
-    console.log(`
-\u{1F4CB} Found ${pendingMigrations.length} pending migration(s):`);
-    pendingMigrations.forEach((migration, idx) => {
-      console.log(`  ${idx + 1}. ${pc2.cyan(migration.name)}`);
-    });
-    if (globalOptions.dryRun) {
-      console.log(pc2.yellow("\n\u{1F50D} Dry run mode - showing what would be applied:"));
-      for (const migration of pendingMigrations) {
-        console.log(`
-${pc2.cyan(`--- ${migration.name} ---`)}`);
-        console.log(pc2.gray(migration.content));
-      }
-      return;
-    }
-    const proceed = options.yes ? true : await confirm3({
-      message: `Apply ${pendingMigrations.length} migration(s) to the database?`
-    });
-    console.log("confirmed apply");
-    if (!proceed) {
-      console.log(pc2.gray("Migration cancelled."));
-      return;
-    }
-    const applySpinner = createSpinner("Applying migrations...");
-    for (const migration of pendingMigrations) {
-      try {
-        applySpinner.update(`Applying ${migration.name}...`);
-        await applyMigration(connection, migration);
-        await recordMigrationApplied(connection, migration);
-        if (globalOptions.debug) {
-          console.log(pc2.green(`  \u2705 Applied ${migration.name}`));
-        }
-      } catch (error) {
-        applySpinner.fail(`Failed to apply ${migration.name}`);
-        console.log(pc2.red(`\u274C Migration failed: ${error}`));
-        if (pendingMigrations.indexOf(migration) < pendingMigrations.length - 1) {
-          const continueApplying = await confirm3({
-            message: "Continue applying remaining migrations?"
-          });
-          if (!continueApplying) {
-            console.log(pc2.yellow("\u26A0\uFE0F  Migration process stopped"));
-            return;
-          }
-        }
-      }
-    }
-    applySpinner.succeed("All migrations applied successfully");
-    console.log(pc2.green("\u2705 Enhanced migrations applied successfully"));
-  } finally {
-    if (connection) {
-      await closeDatabaseConnection(connection);
-    }
-  }
-}
-async function connectToDatabase(envCfg) {
-  console.log("in connectToDatabase");
-  const connectionString = envCfg.db_connection_string || envCfg.databaseUrl;
-  console.log("connectionString:", connectionString);
-  if (!connectionString) {
-    throw new Error('Database connection string not found in flow.config.json. Please provide "db_connection_string" or "databaseUrl".');
-  }
-  const dbType = connectionString.split(":")[0];
-  console.log("dbType:", dbType);
-  switch (dbType) {
-    case "postgresql":
-      console.log("connecting to postgresql");
-      const pgClient = new PgClient({ connectionString });
-      await pgClient.connect();
-      console.log("connected to postgresql");
-      return { type: "postgresql", client: pgClient };
-    case "mysql":
-      console.log("connecting to mysql");
-      const mysqlConnection = await mysql.createConnection(connectionString);
-      console.log("connected to mysql");
-      return { type: "mysql", client: mysqlConnection };
-    case "sqlite":
-      console.log("connecting to sqlite");
-      const sqlitePath = connectionString.substring("sqlite:".length);
-      const sqliteDb = new Database(sqlitePath || "./database.db");
-      console.log("connected to sqlite");
-      return { type: "sqlite", client: sqliteDb };
-    default:
-      throw new Error(`Unsupported database type: ${dbType}`);
-  }
-}
-async function ensureMigrationsTable(connection) {
-  const createTableQuery = (() => {
-    switch (connection.type) {
-      case "postgresql":
-        return `
-          CREATE TABLE IF NOT EXISTS flow_migrations (
-            id SERIAL PRIMARY KEY,
-            name VARCHAR(255) NOT NULL UNIQUE,
-            checksum VARCHAR(64),
-            applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-          )
-        `;
-      case "mysql":
-        return `
-          CREATE TABLE IF NOT EXISTS flow_migrations (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            name VARCHAR(255) NOT NULL UNIQUE,
-            checksum VARCHAR(64),
-            applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-          )
-        `;
-      case "sqlite":
-        return `
-          CREATE TABLE IF NOT EXISTS flow_migrations (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL UNIQUE,
-            checksum TEXT,
-            applied_at DATETIME DEFAULT CURRENT_TIMESTAMP
-          )
-        `;
-    }
-  })();
-  await executeQuery(connection, createTableQuery);
-}
-async function findPendingMigrations(connection, migrationsDir, targetMigration) {
-  if (!await fs7.pathExists(migrationsDir)) {
-    throw new Error(`Migrations directory not found: ${migrationsDir}`);
-  }
-  const appliedMigrations = await executeQuery(connection, "SELECT name FROM flow_migrations ORDER BY applied_at");
-  const appliedNames = new Set(appliedMigrations.map((row) => row.name));
-  const allFiles = await fs7.readdir(migrationsDir);
-  const migrationFiles = allFiles.filter((f) => f.endsWith(".sql") || f.endsWith(".ts") || f.endsWith(".js")).sort();
-  const pendingMigrations = [];
-  for (const file of migrationFiles) {
-    const migrationName = path6.parse(file).name;
-    if (appliedNames.has(migrationName)) {
-      continue;
-    }
-    if (targetMigration && migrationName !== targetMigration) {
-      continue;
-    }
-    const filePath = path6.join(migrationsDir, file);
-    let content = await fs7.readFile(filePath, "utf-8");
-    if (file.endsWith(".ts") || file.endsWith(".js")) {
-      content = extractSQLFromMigrationFile2(content);
-    }
-    pendingMigrations.push({
-      name: migrationName,
-      path: filePath,
-      content
-    });
-    if (targetMigration && migrationName === targetMigration) {
-      break;
-    }
-  }
-  return pendingMigrations;
-}
-async function applyMigration(connection, migration) {
-  const statements = migration.content.split(";").map((stmt) => stmt.trim()).filter((stmt) => stmt.length > 0);
-  for (const statement of statements) {
-    if (statement.trim()) {
-      await executeQuery(connection, statement);
-    }
-  }
-}
-async function recordMigrationApplied(connection, migration) {
-  const checksum = Buffer.from(migration.content).toString("base64").slice(0, 32);
-  const insertQuery = (() => {
-    switch (connection.type) {
-      case "postgresql":
-        return "INSERT INTO flow_migrations (name, checksum) VALUES ($1, $2)";
-      case "mysql":
-        return "INSERT INTO flow_migrations (name, checksum) VALUES (?, ?)";
-      case "sqlite":
-        return "INSERT INTO flow_migrations (name, checksum) VALUES (?, ?)";
-    }
-  })();
-  await executeQuery(connection, insertQuery, [migration.name, checksum]);
-}
-async function executeQuery(connection, query, params) {
-  switch (connection.type) {
-    case "postgresql":
-      const pgResult = await connection.client.query(query, params);
-      return pgResult.rows;
-    case "mysql":
-      const [mysqlResult] = await connection.client.execute(query, params);
-      return mysqlResult;
-    case "sqlite":
-      const stmt = connection.client.prepare(query);
-      return stmt.all(params);
-  }
-}
-async function closeDatabaseConnection(connection) {
-  switch (connection.type) {
-    case "postgresql":
-      await connection.client.end();
-      break;
-    case "mysql":
-      await connection.client.end();
-      break;
-    case "sqlite":
-      connection.client.close();
-      break;
-  }
-}
-function extractSQLFromMigrationFile2(content) {
-  const match = content.match(/sql`([\s\S]*)`/);
-  const extractedSQL = match ? match[1].trim() : "";
-  if (!extractedSQL) {
-    if (content.includes("CREATE") || content.includes("ALTER") || content.includes("INSERT") || content.includes("UPDATE") || content.includes("DELETE")) {
-      return content;
-    }
-  }
-  return extractedSQL || content;
-}
-
-// src/commands/back.ts
-import { confirm as confirm4 } from "@clack/prompts";
-import fs8 from "fs-extra";
-import path7 from "path";
-import pc3 from "picocolors";
-import { Client as PgClient2 } from "pg";
-import mysql2 from "mysql2/promise";
-import Database2 from "better-sqlite3";
-async function backCommand(options, globalOptions) {
-  const projectPath = options.project ? path7.resolve(options.project) : process.cwd();
-  const cfg = await getFlowConfig(globalOptions, projectPath);
-  const envCfg = cfg.environments[cfg.defaultEnvironment];
-  if (globalOptions.debug) {
-    console.log("Rolling back using env:", cfg.defaultEnvironment);
-  }
-  const spinner3 = createSpinner("Connecting to database...");
-  let connection = null;
-  try {
-    connection = await connectToDatabase2(envCfg);
-    spinner3.update("Connected to database successfully");
-  } catch (error) {
-    spinner3.fail("Failed to connect to database");
-    console.log(pc3.red(`\u274C Database connection failed: ${error}`));
-    return;
-  }
-  try {
-    spinner3.update("Fetching applied migrations...");
-    const appliedMigrations = await getAppliedMigrations(connection);
-    if (appliedMigrations.length === 0) {
-      spinner3.succeed("No migrations to rollback");
-      console.log(pc3.green("\u2705 No migrations have been applied"));
-      return;
-    }
-    spinner3.stop();
-    const migrationsToRollback = await determineMigrationsToRollback(
-      appliedMigrations,
-      options,
-      envCfg,
-      projectPath
-    );
-    if (migrationsToRollback.length === 0) {
-      console.log(pc3.yellow("\u26A0\uFE0F  No migrations selected for rollback"));
-      return;
-    }
-    console.log(`
-\u{1F4CB} Migrations to rollback (${migrationsToRollback.length}):`);
-    migrationsToRollback.forEach((migration, idx) => {
-      console.log(`  ${idx + 1}. ${pc3.cyan(migration.name)} (applied: ${migration.applied_at})`);
-    });
-    if (globalOptions.dryRun) {
-      console.log(pc3.yellow("\n\u{1F50D} Dry run mode - showing what would be rolled back"));
-      for (const migration of migrationsToRollback) {
-        console.log(`
-${pc3.cyan(`--- Rollback ${migration.name} ---`)}`);
-        const downContent = await findDownMigration(migration, envCfg, projectPath);
-        if (downContent) {
-          console.log(pc3.gray(downContent));
-        } else {
-          console.log(pc3.yellow("\u26A0\uFE0F  No rollback script found for this migration"));
-        }
-      }
-      return;
-    }
-    const riskyMigrations = migrationsToRollback.filter(
-      (m) => m.name.toLowerCase().includes("drop") || m.name.toLowerCase().includes("delete")
-    );
-    if (riskyMigrations.length > 0) {
-      console.log(pc3.red("\n\u26A0\uFE0F  WARNING: Some migrations may contain destructive operations:"));
-      riskyMigrations.forEach((m) => {
-        console.log(`  \u2022 ${pc3.red(m.name)}`);
-      });
-    }
-    const proceed = options.yes ? true : await confirm4({
-      message: riskyMigrations.length > 0 ? pc3.red("\u26A0\uFE0F  Are you sure you want to rollback these potentially destructive migrations?") : `Rollback ${migrationsToRollback.length} migration(s)?`
-    });
-    if (!proceed) {
-      console.log(pc3.gray("Rollback cancelled."));
-      return;
-    }
-    const rollbackSpinner = createSpinner("Rolling back migrations...");
-    for (const migration of migrationsToRollback) {
-      try {
-        rollbackSpinner.update(`Rolling back ${migration.name}...`);
-        const downContent = await findDownMigration(migration, envCfg, projectPath);
-        if (downContent) {
-          await executeMigrationRollback(connection, downContent);
-        } else {
-          console.log(pc3.yellow(`\u26A0\uFE0F  No rollback script found for ${migration.name}, skipping...`));
-        }
-        await removeMigrationRecord(connection, migration);
-        if (globalOptions.debug) {
-          console.log(pc3.green(`  \u2705 Rolled back ${migration.name}`));
-        }
-      } catch (error) {
-        rollbackSpinner.fail(`Failed to rollback ${migration.name}`);
-        console.log(pc3.red(`\u274C Rollback failed: ${error}`));
-        if (migrationsToRollback.indexOf(migration) < migrationsToRollback.length - 1) {
-          const continueRollback = await confirm4({
-            message: "Continue rolling back remaining migrations?"
-          });
-          if (!continueRollback) {
-            console.log(pc3.yellow("\u26A0\uFE0F  Rollback process stopped"));
-            return;
-          }
-        }
-      }
-    }
-    rollbackSpinner.succeed("All migrations rolled back successfully");
-    console.log(pc3.green("\u2705 Migration rollback completed safely"));
-  } finally {
-    if (connection) {
-      await closeDatabaseConnection2(connection);
-    }
-  }
-}
-async function connectToDatabase2(envCfg) {
-  const connectionString = envCfg.db_connection_string || envCfg.databaseUrl;
-  if (!connectionString) {
-    throw new Error('Database connection string not found in flow.config.json. Please provide "db_connection_string" or "databaseUrl".');
-  }
-  const dbType = connectionString.split(":")[0];
-  switch (dbType) {
-    case "postgresql":
-      const pgClient = new PgClient2({ connectionString });
-      await pgClient.connect();
-      return { type: "postgresql", client: pgClient };
-    case "mysql":
-      const mysqlConnection = await mysql2.createConnection(connectionString);
-      return { type: "mysql", client: mysqlConnection };
-    case "sqlite":
-      const sqlitePath = connectionString.substring("sqlite:".length);
-      const sqliteDb = new Database2(sqlitePath || "./database.db");
-      return { type: "sqlite", client: sqliteDb };
-    default:
-      throw new Error(`Unsupported database type: ${dbType}`);
-  }
-}
-async function getAppliedMigrations(connection) {
-  try {
-    const result = await executeQuery2(
-      connection,
-      "SELECT id, name, checksum, applied_at FROM flow_migrations ORDER BY id DESC"
-    );
-    return result;
-  } catch (error) {
-    return [];
-  }
-}
-async function determineMigrationsToRollback(appliedMigrations, options, envCfg, projectPath) {
-  if (options.to) {
-    const targetIndex = appliedMigrations.findIndex((m) => m.name === options.to);
-    if (targetIndex === -1) {
-      throw new Error(`Migration '${options.to}' not found in applied migrations`);
-    }
-    return appliedMigrations.slice(0, targetIndex);
-  }
-  const steps = options.steps || 1;
-  if (steps >= appliedMigrations.length) {
-    const confirmAll = options.yes ? true : await confirm4({
-      message: pc3.yellow(`\u26A0\uFE0F  This will rollback ALL ${appliedMigrations.length} migrations. Continue?`)
-    });
-    if (!confirmAll) {
-      return [];
-    }
-    return appliedMigrations;
-  }
-  return appliedMigrations.slice(0, steps);
-}
-async function findDownMigration(migration, envCfg, projectPath) {
   const migrationsDir = envCfg.migrationsPath || "./migrations";
-  const absoluteMigrationsDir = path7.resolve(projectPath, migrationsDir);
-  const files = await fs8.readdir(absoluteMigrationsDir);
-  for (const filename of files) {
-    if (path7.parse(filename).name === migration.name) {
-      const content = await fs8.readFile(path7.join(absoluteMigrationsDir, filename), "utf-8");
-      return extractDownSQLFromMigrationFile(content);
-    }
+  const absoluteMigrationsDir = path8.resolve(projectPath, migrationsDir);
+  intro5("\u{1F4CA} Migration Status");
+  if (!await fs10.pathExists(absoluteMigrationsDir)) {
+    console.log(pc6.yellow("Migrations directory not found."));
+    return;
   }
-  return null;
-}
-async function executeMigrationRollback(connection, downContent) {
-  const statements = downContent.split(";").filter((s) => s.trim() !== "");
-  for (const statement of statements) {
-    await executeQuery2(connection, statement);
+  const files = await fs10.readdir(absoluteMigrationsDir);
+  const migrationFiles = files.filter((file) => file.endsWith(".sql")).sort();
+  if (migrationFiles.length === 0) {
+    console.log(pc6.yellow("No migration files found."));
+  } else {
+    console.log(pc6.bold("Found migrations:"));
+    migrationFiles.forEach((file) => {
+      console.log(`  - ${pc6.cyan(file)}`);
+    });
   }
+  outro5("\u{1F4CA} Status check complete.");
 }
-async function removeMigrationRecord(connection, migration) {
-  const deleteQuery = (() => {
-    switch (connection.type) {
-      case "postgresql":
-        return "DELETE FROM flow_migrations WHERE id = $1";
-      case "mysql":
-        return "DELETE FROM flow_migrations WHERE id = ?";
-      case "sqlite":
-        return "DELETE FROM flow_migrations WHERE id = ?";
-    }
-  })();
-  await executeQuery2(connection, deleteQuery, [migration.id]);
-}
-async function executeQuery2(connection, query, params) {
-  switch (connection.type) {
-    case "postgresql":
-      const pgResult = await connection.client.query(query, params);
-      return pgResult.rows;
-    case "mysql":
-      const [mysqlResult] = await connection.client.execute(query, params);
-      return mysqlResult;
-    case "sqlite":
-      const stmt = connection.client.prepare(query);
-      if (query.toLowerCase().trim().startsWith("select")) {
-        return stmt.all(params);
-      } else {
-        stmt.run(params);
-        return [];
-      }
-    default:
-      throw new Error(`Unsupported database type: ${connection.type}`);
+var init_status = __esm({
+  "src/commands/status.ts"() {
+    "use strict";
+    init_config();
   }
-}
-async function closeDatabaseConnection2(connection) {
-  switch (connection.type) {
-    case "postgresql":
-      await connection.client.end();
-      break;
-    case "mysql":
-      await connection.client.end();
-      break;
-    case "sqlite":
-      connection.client.close();
-      break;
-  }
-}
-function extractDownSQLFromMigrationFile(content) {
-  const downPatterns = [
-    /public async down\(.*?\): Promise<void> \{([\s\S]*?)\}/,
-    /async down\(.*?\) \{([\s\S]*?)\}/,
-    /down.*?{([\s\S]*?)}/
-  ];
-  for (const pattern of downPatterns) {
-    const match = content.match(pattern);
-    if (match) {
-      const downCode = match[1];
-      const sqlPatterns = [
-        /queryRunner\.query\s*\(\s*[`"']([^`"']+)[`"']/g,
-        /sql\s*`([^`]+)`/g,
-        /"((?:DROP|ALTER|CREATE|INSERT|UPDATE|DELETE)[^"]+)"/gi
-      ];
-      let extractedSQL = "";
-      for (const sqlPattern of sqlPatterns) {
-        let sqlMatch;
-        while ((sqlMatch = sqlPattern.exec(downCode)) !== null) {
-          extractedSQL += sqlMatch[1] + ";\n";
-        }
-      }
-      return extractedSQL;
-    }
-  }
-  return "";
-}
+});
 
 // src/index.ts
-var handleCommand = async (commandPromise) => {
-  try {
-    await commandPromise;
-  } catch (error) {
-    if (isCancel(error)) {
-      cancel("Operation cancelled.");
-      process.exit(0);
+import { program } from "commander";
+import { intro as intro6, outro as outro6 } from "@clack/prompts";
+import pc7 from "picocolors";
+import gradient from "gradient-string";
+import boxen from "boxen";
+var lazyImport = (importFn) => {
+  let cachedModule = null;
+  return async () => {
+    if (!cachedModule) {
+      cachedModule = await importFn();
     }
-    log2.error(error instanceof Error ? error.message : "An unknown error occurred.");
-    process.exit(1);
-  }
+    return cachedModule;
+  };
 };
-var program = new Command();
-program.name("flow").description("Enhanced database migration CLI tool for production-safety").version(version, "-v, --version", "Output the current version").option("-d, --debug", "Enable verbose logging").option("-c, --config <path>", "Path to flow.config.json", "./flow.config.json").option("--dry-run", "Show what would be done without executing");
-program.command("init").description("Initialize flow configuration in current project").option("--project <path>", "Path to the project directory").option("--env-name <name>", "Name for the initial environment", "development").option("--db-url <url>", "Database connection string").option("--migrations-path <path>", "Path to the migrations folder").option("-y, --yes", "Skip interactive prompts and use default or provided values").action(async (options) => {
-  intro("\u{1F30A} DriftJS Flow - Initialize");
-  await handleCommand(initCommand(options, program.opts()));
-  outro("\u2705 Flow configuration initialized successfully!");
-});
-program.command("sync").description("Detect ORM changes and create enhanced migration plan").option("--force", "Force re-analysis of existing migrations").option("--orm <name>", "Specify ORM (prisma, drizzle, typeorm, auto)", "auto").option("--project <path>", "Path to the project directory").option("-y, --yes", "Skip interactive prompts and use default or provided values").action(async (options) => {
-  intro("\u{1F30A} DriftJS Flow - Sync");
-  await handleCommand(syncCommand(options, program.opts()));
-  outro("\u2705 Sync completed");
-});
-program.command("apply").description("Apply pending migrations to the database").option("--migration <name>", "Apply a specific migration by name").option("--target <name>", "Apply migrations up to and including the target migration").option("--project <path>", "Path to the project directory").option("-y, --yes", "Skip interactive prompts and use default or provided values").action(async (options) => {
-  intro("\u{1F30A} DriftJS Flow - Apply");
-  await handleCommand(applyCommand(options, program.opts()));
-  outro("\u2705 Apply completed");
-});
-program.command("back").description("Rollback the latest migration batch").option("--steps <n>", "Number of migrations to rollback", "1").option("--to <name>", "Rollback to a specific migration (exclusive)").option("--project <path>", "Path to the project directory").option("-y, --yes", "Skip interactive prompts and use default or provided values").action(async (options) => {
-  intro("\u{1F30A} DriftJS Flow - Rollback");
-  if (options.steps) {
-    options.steps = parseInt(options.steps, 10);
+var getEnhanceCommand = lazyImport(() => Promise.resolve().then(() => (init_enhance(), enhance_exports)));
+var getValidateCommand = lazyImport(() => Promise.resolve().then(() => (init_validate(), validate_exports)));
+var getPlanCommand = lazyImport(() => Promise.resolve().then(() => (init_plan(), plan_exports)));
+var getRollbackCommand = lazyImport(() => Promise.resolve().then(() => (init_rollback(), rollback_exports)));
+var getInitCommand = lazyImport(() => Promise.resolve().then(() => (init_init(), init_exports)));
+var getConfigCommand = lazyImport(() => Promise.resolve().then(() => (init_config4(), config_exports)));
+var getStatusCommand = lazyImport(() => Promise.resolve().then(() => (init_status(), status_exports)));
+var cachedBanner = null;
+function getBanner() {
+  if (cachedBanner) return cachedBanner;
+  const flowTitle = gradient("#00D4FF", "#0099CC", "#006699")("Flow");
+  const subtitle = pc7.dim("Database Migration Enhancement Tool");
+  cachedBanner = boxen(
+    `${flowTitle}
+${subtitle}`,
+    {
+      padding: { top: 1, bottom: 1, left: 2, right: 2 },
+      margin: { top: 1, bottom: 1 },
+      borderStyle: "round",
+      borderColor: "cyan",
+      backgroundColor: "#001122",
+      align: "center"
+    }
+  );
+  return cachedBanner;
+}
+function showBanner() {
+  console.log(getBanner());
+}
+function handleError(error) {
+  console.error(pc7.red("\n\u274C Error:"), error.message || error);
+  if (program.opts().verbose && error.stack) {
+    console.error(pc7.dim("\nStack trace:"));
+    console.error(pc7.dim(error.stack));
   }
-  await handleCommand(backCommand(options, program.opts()));
-  outro("\u2705 Rollback completed");
+  process.exit(1);
+}
+process.on("uncaughtException", handleError);
+process.on("unhandledRejection", handleError);
+program.name("flow").description("\u{1F30A} Flow - Database Migration Enhancement Tool").version("1.2.0").option("-v, --verbose", "Enable verbose output for debugging").option("-c, --config <path>", "Path to configuration file").option("--dry", "Run in dry-run mode (preview changes without applying)").hook("preAction", () => {
+  const command = process.argv[2];
+  if (command && !["--help", "-h", "--version", "-V"].includes(command)) {
+    showBanner();
+  }
 });
-program.command("test").description("Run internal diagnostics").option("--project <path>", "Path to the project directory").action(testCommand);
+program.command("enhance").description("\u{1F680} Interactively enhance a migration file with safety and performance improvements").argument("[file]", "Migration file to enhance (auto-detects latest if not specified)").option("-p, --project <path>", "Path to project directory").action(async (file, options) => {
+  try {
+    intro6(pc7.cyan("Starting Flow Enhancement Process"));
+    const { enhanceCommand: enhanceCommand2 } = await getEnhanceCommand();
+    await enhanceCommand2({ file, project: options.project }, program.opts());
+    outro6(pc7.green("Enhancement completed! \u{1F389}"));
+  } catch (error) {
+    handleError(error);
+  }
+});
+program.command("validate").description("\u{1F50D} Validate a migration file for potential issues").argument("[file]", "Migration file to validate (auto-detects latest if not specified)").option("-p, --project <path>", "Path to project directory").action(async (file, options) => {
+  try {
+    intro6(pc7.cyan("Starting Migration Validation"));
+    const { validateCommand: validateCommand2 } = await getValidateCommand();
+    await validateCommand2({ file, project: options.project }, program.opts());
+    outro6(pc7.green("Validation completed! \u2705"));
+  } catch (error) {
+    handleError(error);
+  }
+});
+program.command("plan").description("\u{1F4CB} Plan enhancement changes for a migration file").argument("[file]", "Migration file to plan (auto-detects latest if not specified)").option("-p, --project <path>", "Path to project directory").action(async (file, options) => {
+  try {
+    intro6(pc7.cyan("Creating Enhancement Plan"));
+    const { planCommand: planCommand2 } = await getPlanCommand();
+    await planCommand2({ file, project: options.project }, program.opts());
+    outro6(pc7.green("Plan created! \u{1F4CB}"));
+  } catch (error) {
+    handleError(error);
+  }
+});
+program.command("rollback").description("\u21A9\uFE0F  Rollback changes to a migration file").argument("[file]", "Migration file to rollback (auto-detects latest if not specified)").option("-p, --project <path>", "Path to project directory").action(async (file, options) => {
+  try {
+    intro6(pc7.cyan("Starting Rollback Process"));
+    const { rollbackCommand: rollbackCommand2 } = await getRollbackCommand();
+    await rollbackCommand2({ file, project: options.project }, program.opts());
+    outro6(pc7.green("Rollback completed! \u21A9\uFE0F"));
+  } catch (error) {
+    handleError(error);
+  }
+});
+program.command("init").description("\u{1F680} Initialize Flow in your project").option("-p, --project <path>", "Path to project directory").action(async (options) => {
+  try {
+    intro6(pc7.cyan("Initializing Flow"));
+    const { initCommand: initCommand2 } = await getInitCommand();
+    await initCommand2({ project: options.project }, program.opts());
+    outro6(pc7.green("Flow initialized successfully! \u{1F680}"));
+  } catch (error) {
+    handleError(error);
+  }
+});
+program.command("config").description("\u2699\uFE0F  Configure Flow settings").option("-p, --project <path>", "Path to project directory").option("-s, --show", "Show current configuration").option("-e, --edit", "Edit configuration interactively").action(async (options) => {
+  try {
+    intro6(pc7.cyan("Managing Flow Configuration"));
+    const { configCommand: configCommand2 } = await getConfigCommand();
+    await configCommand2(options, program.opts());
+    outro6(pc7.green("Configuration updated! \u2699\uFE0F"));
+  } catch (error) {
+    handleError(error);
+  }
+});
+program.command("status").description("\u{1F4CA} Show Flow status and statistics").option("-p, --project <path>", "Path to project directory").action(async (options) => {
+  try {
+    intro6(pc7.cyan("Getting Flow Status"));
+    const { statusCommand: statusCommand2 } = await getStatusCommand();
+    await statusCommand2({ project: options.project }, program.opts());
+    outro6(pc7.green("Status retrieved! \u{1F4CA}"));
+  } catch (error) {
+    handleError(error);
+  }
+});
+if (process.argv.length === 2) {
+  showBanner();
+  console.log(pc7.dim("\n\u{1F4A1} Tip: Run"), pc7.cyan("flow --help"), pc7.dim("to see available commands"));
+  console.log(pc7.dim("   Start with:"), pc7.cyan("flow init"), pc7.dim("to initialize Flow in your project"));
+  console.log(pc7.dim("   Then use:"), pc7.cyan("flow enhance"), pc7.dim("to enhance your latest migration"));
+  console.log("");
+}
 program.parse();
 //# sourceMappingURL=index.js.map

@@ -1,6 +1,8 @@
 import pkg from 'node-sql-parser';
 const { Parser } = pkg;
-import type { AST, Parser as ParserType } from 'node-sql-parser';
+import type { AST } from 'node-sql-parser';
+import pkg from 'node-sql-parser';
+const { Parser } = pkg;
 
 /**
  * SQL operation types that can be parsed and analyzed

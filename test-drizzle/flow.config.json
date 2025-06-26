@@ -1,0 +1,17 @@
+{
+  "defaultEnvironment": "development",
+  "environments": {
+    "development": {
+      "migrationsPath": "./migrations",
+      "databaseType": "sqlite"
+    }
+  },
+  "enhancements": {
+    "enableSafetyEnhancements": true,
+    "enableSpeedEnhancements": true,
+    "defaultConfirmSafety": true,
+    "defaultConfirmSpeed": false,
+    "disabledEnhancements": [],
+    "customPriorities": {}
+  }
+} 
