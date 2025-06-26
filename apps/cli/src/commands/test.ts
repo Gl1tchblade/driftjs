@@ -4,13 +4,17 @@
 
 import { spinner } from '@clack/prompts'
 import { getFlowConfig, GlobalOptions } from '../lib/config.js'
+import path from 'node:path'
 
-export interface TestOptions {}
+export interface TestOptions {
+  project?: string
+}
 
 export async function testCommand(options: TestOptions, globalOptions: GlobalOptions): Promise<void> {
   const s = spinner()
-  const cfg = await getFlowConfig(globalOptions)
-  if (globalOptions.verbose) {
+  const projectPath = options.project ? path.resolve(options.project) : process.cwd()
+  const cfg = await getFlowConfig(globalOptions, projectPath)
+  if (globalOptions.debug) {
     console.log('Testing migrations against env:', cfg.defaultEnvironment)
   }
   

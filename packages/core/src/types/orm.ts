@@ -44,7 +44,7 @@ export interface PrismaConfig extends ORMConfig {
 export interface DrizzleConfig extends ORMConfig {
   type: 'drizzle'
   configFile: FilePath
-  driver: 'pg' | 'mysql2' | 'better-sqlite3'
+  driver: 'pg' | 'mysql2' | 'better-sqlite3' | 'sqlite'
   schemaPath: string
   outDir: string
 }

@@ -11,8 +11,8 @@ import { resolve, dirname } from 'node:path'
  * Locate and parse flow.config.json.
  * If --config is supplied use that path, otherwise walk parent directories.
  */
-export async function getFlowConfig(global: GlobalOptions) {
-  const configPath = await findConfigFile(process.cwd(), global.config)
+export async function getFlowConfig(global: GlobalOptions, projectPath?: string) {
+  const configPath = await findConfigFile(projectPath || process.cwd(), global.config)
   return JSON.parse(await fsExtra.readFile(configPath, 'utf8'))
 }
 

@@ -1,1 +1,13 @@
-{"version":"7","dialect":"sqlite","entries":[]}
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1750962264860,
+      "tag": "0000_needy_queen_noir",
+      "breakpoints": true
+    }
+  ]
+}

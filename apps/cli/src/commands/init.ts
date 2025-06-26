@@ -7,6 +7,7 @@ import { GlobalOptions } from '../lib/config.js'
 import fsExtra from 'fs-extra'
 import { resolve } from 'node:path'
 import dotenv from 'dotenv'
+import { PrismaDetector, DrizzleDetector, TypeORMDetector } from '@driftjs/analyzer'
 // @ts-ignore – optional type import not strictly needed for compilation
 // import type { FlowConfig } from '@driftjs/core'
 
@@ -16,20 +17,21 @@ export interface InitOptions {
   dbUrl?: string
   migrationsPath?: string
   yes?: boolean
+  project?: string
 }
 
-async function findDatabaseUrl(envName: string): Promise<string> {
+async function findDatabaseUrl(envName: string, projectPath: string): Promise<string> {
   const candidateFiles: string[] = []
   // 1) current directory .env
-  candidateFiles.push(resolve('.env'))
+  candidateFiles.push(resolve(projectPath, '.env'))
   // 2) parent directories up to repo root
-  const parts = process.cwd().split('/')
+  const parts = projectPath.split('/')
   for (let i = parts.length - 1; i > 0; i--) {
     candidateFiles.push(parts.slice(0, i + 1).join('/') + '/.env')
   }
   // 3) common monorepo locations (apps/*/.env and packages/*/.env)
-  const appsDir = resolve('apps')
-  const pkgsDir = resolve('packages')
+  const appsDir = resolve(projectPath, 'apps')
+  const pkgsDir = resolve(projectPath, 'packages')
   if (await fsExtra.pathExists(appsDir)) {
     const sub = await fsExtra.readdir(appsDir)
     sub.forEach((s) => candidateFiles.push(resolve(appsDir, s, '.env')))
@@ -52,7 +54,7 @@ async function findDatabaseUrl(envName: string): Promise<string> {
   return ''
 }
 
-async function detectMigrationsDir(): Promise<string | null> {
+async function detectMigrationsDir(projectPath: string): Promise<string | null> {
   const candidates = [
     'migrations',
     'db/migrations',
@@ -63,8 +65,8 @@ async function detectMigrationsDir(): Promise<string | null> {
   // Parse drizzle.config.* for out path
   const drizzleConfigFiles = ['drizzle.config.ts', 'drizzle.config.js', 'drizzle.config.mjs', 'drizzle.config.cjs']
   for (const f of drizzleConfigFiles) {
-    if (await fsExtra.pathExists(resolve(f))) {
-      const content = await fsExtra.readFile(resolve(f), 'utf8')
+    if (await fsExtra.pathExists(resolve(projectPath, f))) {
+      const content = await fsExtra.readFile(resolve(projectPath, f), 'utf8')
       const match = content.match(/out\s*:\s*["'`](.+?)["'`]/)
       if (match) {
         candidates.unshift(match[1])
@@ -72,12 +74,13 @@ async function detectMigrationsDir(): Promise<string | null> {
     }
   }
   for (const rel of candidates) {
-    if (await fsExtra.pathExists(resolve(rel))) return rel
+    if (await fsExtra.pathExists(resolve(projectPath, rel))) return rel
   }
   return null
 }
 
 export async function initCommand(options: InitOptions, globalOptions: GlobalOptions): Promise<void> {
+  const projectPath = resolve(options.project || process.cwd())
   const spinner = createSpinner('Collecting project information')
 
   let envName: string, databaseUrl: string, migrationsPath: string;
@@ -85,7 +88,7 @@ export async function initCommand(options: InitOptions, globalOptions: GlobalOpt
   if (options.yes) {
     // Non-interactive mode
     envName = options.envName || 'development';
-    const detectedDb = await findDatabaseUrl(envName);
+    const detectedDb = await findDatabaseUrl(envName, projectPath);
     databaseUrl = options.dbUrl || detectedDb;
 
     if (!databaseUrl) {
@@ -93,7 +96,7 @@ export async function initCommand(options: InitOptions, globalOptions: GlobalOpt
       throw new Error('FLOW_MISSING_DB_NON_INTERACTIVE');
     }
     
-    const detectedPath = await detectMigrationsDir();
+    const detectedPath = await detectMigrationsDir(projectPath);
     migrationsPath = options.migrationsPath || detectedPath || './migrations';
 
   } else {
@@ -104,7 +107,7 @@ export async function initCommand(options: InitOptions, globalOptions: GlobalOpt
     });
     envName = envNameInput?.trim() || 'development';
 
-    const defaultDb = await findDatabaseUrl(envName);
+    const defaultDb = await findDatabaseUrl(envName, projectPath);
     const dbPrompt = 'Database connection string (e.g. postgresql://user:pass@localhost:5432/db)';
     const dbInput = await textInput(dbPrompt, {
       placeholder: defaultDb || 'postgresql://user:pass@localhost:5432/db',
@@ -117,7 +120,7 @@ export async function initCommand(options: InitOptions, globalOptions: GlobalOpt
       throw new Error('FLOW_MISSING_DB');
     }
 
-    const detectedPath = (await detectMigrationsDir()) || './migrations';
+    const detectedPath = (await detectMigrationsDir(projectPath)) || './migrations';
     const migInput = await textInput('Path to migrations folder', {
       placeholder: detectedPath,
       defaultValue: detectedPath
@@ -133,31 +136,39 @@ export async function initCommand(options: InitOptions, globalOptions: GlobalOpt
 
   spinner.update('Generating flow.config')
 
-  // Guess DB type
-  const dbTypeMatch = databaseUrl.split(':')[0]
+  // Detect ORM
+  const detectors = [
+    { name: 'prisma', detector: new PrismaDetector() },
+    { name: 'drizzle', detector: new DrizzleDetector() },
+    { name: 'typeorm', detector: new TypeORMDetector() }
+  ]
+  let detectedORM: string | null = null;
+  for (const { name, detector } of detectors) {
+    const result = await detector.detect(projectPath)
+    if (result.found) {
+      detectedORM = name
+      break
+    }
+  }
 
   // Build config object
   const config: any = {
     version: '0.1.0',
     defaultEnvironment: envName,
+    ...(detectedORM && { orm: detectedORM }),
     environments: {
       [envName]: {
-        databaseUrl,
-        migrationsPath
+        db_connection_string: databaseUrl,
+        migrationsPath: migrationsPath
       }
     },
     safety: {
       maxTableSizeMB: 1024,
       maxLockTimeMs: 300_000
-    },
-    database: {
-      default: {
-        type: dbTypeMatch
-      }
     }
   }
 
-  const configPath = resolve(globalOptions.config || 'flow.config.json')
+  const configPath = resolve(projectPath, globalOptions.config || 'flow.config.json')
 
   if (await fsExtra.pathExists(configPath) && !options.yes && !(await confirmAction(`Overwrite existing ${configPath}?`))) {
     spinner.fail('Init aborted – config exists')
@@ -174,7 +185,7 @@ export async function initCommand(options: InitOptions, globalOptions: GlobalOpt
 
   // --- NEW: ensure package.json has a "flow" script for easy execution
   try {
-    const pkgPath = resolve('package.json')
+    const pkgPath = resolve(projectPath, 'package.json')
     if (await fsExtra.pathExists(pkgPath)) {
       // Dynamic import to avoid increasing cold start
       const fsmod: any = await import('fs-extra')

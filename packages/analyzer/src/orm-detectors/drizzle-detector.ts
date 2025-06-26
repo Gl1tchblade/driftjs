@@ -92,8 +92,8 @@ export class DrizzleDetector extends BaseORMDetector {
       const configContent = await fs.readFile(configFile.absolute, 'utf-8')
       
       // Basic config parsing - in production, we'd use a proper TS/JS parser
-      const driver = this.extractConfigValue(configContent, 'driver') || 'pg'
-      const validDrivers = ['pg', 'mysql2', 'better-sqlite3'] as const
+      const driver = this.extractConfigValue(configContent, 'dialect') || 'pg'
+      const validDrivers = ['pg', 'mysql2', 'better-sqlite3', 'sqlite'] as const
       const mappedDriver = validDrivers.includes(driver as any) ? driver as typeof validDrivers[number] : 'pg'
       
       const config: DrizzleConfig = {

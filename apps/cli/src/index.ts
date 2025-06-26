@@ -39,6 +39,7 @@ program
 program
   .command('init')
   .description('Initialize flow configuration in current project')
+  .option('--project <path>', 'Path to the project directory')
   .option('--env-name <name>', 'Name for the initial environment', 'development')
   .option('--db-url <url>', 'Database connection string')
   .option('--migrations-path <path>', 'Path to the migrations folder')
@@ -52,9 +53,11 @@ program
 // flow sync
 program
   .command('sync')
-  .description('Analyse schema and create migration plan')
-  .option('-f, --force', 'Force re-analysis of existing migrations even if no schema changes detected')
-  .option('--orm <type>', 'Specify ORM type (prisma|drizzle|typeorm|auto)', 'auto')
+  .description('Detect ORM changes and create enhanced migration plan')
+  .option('--force', 'Force re-analysis of existing migrations')
+  .option('--orm <name>', 'Specify ORM (prisma, drizzle, typeorm, auto)', 'auto')
+  .option('--project <path>', 'Path to the project directory')
+  .option('-y, --yes', 'Skip interactive prompts and use default or provided values')
   .action(async (options) => {
     intro('🌊 DriftJS Flow - Sync')
     await handleCommand(syncCommand(options, program.opts() as any));
@@ -67,6 +70,8 @@ program
   .description('Apply pending migrations to the database')
   .option('--migration <name>', 'Apply a specific migration by name')
   .option('--target <name>', 'Apply migrations up to and including the target migration')
+  .option('--project <path>', 'Path to the project directory')
+  .option('-y, --yes', 'Skip interactive prompts and use default or provided values')
   .action(async (options) => {
     intro('🌊 DriftJS Flow - Apply')
     await handleCommand(applyCommand(options, program.opts() as any));
@@ -79,6 +84,8 @@ program
   .description('Rollback the latest migration batch')
   .option('--steps <n>', 'Number of migrations to rollback', '1')
   .option('--to <name>', 'Rollback to a specific migration (exclusive)')
+  .option('--project <path>', 'Path to the project directory')
+  .option('-y, --yes', 'Skip interactive prompts and use default or provided values')
   .action(async (options) => {
     intro('🌊 DriftJS Flow - Rollback')
     // Convert steps to number
@@ -93,6 +100,7 @@ program
 program
   .command('test')
   .description('Run internal diagnostics')
+  .option('--project <path>', 'Path to the project directory')
   .action(testCommand as any)
 
 // Execute the CLI

@@ -15,6 +15,8 @@ import sqlite3 from 'sqlite3'
 export interface ApplyOptions {
   migration?: string
   target?: string
+  project?: string
+  yes?: boolean
 }
 
 interface DatabaseConnection {
@@ -23,9 +25,8 @@ interface DatabaseConnection {
 }
 
 export async function applyCommand(options: ApplyOptions, globalOptions: GlobalOptions): Promise<void> {
-  console.log('applyCommand started'); // DEBUG LOG
-  const cfg = await getFlowConfig(globalOptions)
-  console.log('got flow config'); // DEBUG LOG
+  const projectPath = options.project ? path.resolve(options.project) : process.cwd()
+  const cfg = await getFlowConfig(globalOptions, projectPath)
   const envCfg = cfg.environments[cfg.defaultEnvironment]
   
   if (globalOptions.debug) {
@@ -57,7 +58,7 @@ export async function applyCommand(options: ApplyOptions, globalOptions: GlobalO
     // Find migrations to apply
     spinner.update('Finding migrations to apply...')
     const migrationsDir = envCfg.migrationsPath || './migrations'
-    const absoluteMigrationsDir = path.resolve(process.cwd(), migrationsDir)
+    const absoluteMigrationsDir = path.resolve(projectPath, migrationsDir)
     
     const pendingMigrations = await findPendingMigrations(connection, absoluteMigrationsDir, options.migration)
     console.log('found pending migrations'); // DEBUG LOG
@@ -84,7 +85,7 @@ export async function applyCommand(options: ApplyOptions, globalOptions: GlobalO
       return
     }
     
-    const proceed = await confirm({
+    const proceed = options.yes ? true : await confirm({
       message: `Apply ${pendingMigrations.length} migration(s) to the database?`
     })
     console.log('confirmed apply'); // DEBUG LOG

@@ -37,177 +37,6 @@ function createSpinner(message) {
 import fsExtra from "fs-extra";
 import { resolve } from "path";
 import dotenv from "dotenv";
-async function findDatabaseUrl(envName) {
-  const candidateFiles = [];
-  candidateFiles.push(resolve(".env"));
-  const parts = process.cwd().split("/");
-  for (let i = parts.length - 1; i > 0; i--) {
-    candidateFiles.push(parts.slice(0, i + 1).join("/") + "/.env");
-  }
-  const appsDir = resolve("apps");
-  const pkgsDir = resolve("packages");
-  if (await fsExtra.pathExists(appsDir)) {
-    const sub = await fsExtra.readdir(appsDir);
-    sub.forEach((s) => candidateFiles.push(resolve(appsDir, s, ".env")));
-  }
-  if (await fsExtra.pathExists(pkgsDir)) {
-    const sub = await fsExtra.readdir(pkgsDir);
-    sub.forEach((s) => candidateFiles.push(resolve(pkgsDir, s, ".env")));
-  }
-  for (const file of candidateFiles) {
-    if (await fsExtra.pathExists(file)) {
-      try {
-        const envVars = dotenv.parse(await fsExtra.readFile(file));
-        const v = envVars.DATABASE_URL || envVars[`DATABASE_URL_${envName.toUpperCase()}`];
-        if (v) return v;
-      } catch {
-      }
-    }
-  }
-  return "";
-}
-async function detectMigrationsDir() {
-  const candidates = [
-    "migrations",
-    "db/migrations",
-    "drizzle/migrations",
-    "prisma/migrations",
-    "database/migrations"
-  ];
-  const drizzleConfigFiles = ["drizzle.config.ts", "drizzle.config.js", "drizzle.config.mjs", "drizzle.config.cjs"];
-  for (const f of drizzleConfigFiles) {
-    if (await fsExtra.pathExists(resolve(f))) {
-      const content = await fsExtra.readFile(resolve(f), "utf8");
-      const match = content.match(/out\s*:\s*["'`](.+?)["'`]/);
-      if (match) {
-        candidates.unshift(match[1]);
-      }
-    }
-  }
-  for (const rel of candidates) {
-    if (await fsExtra.pathExists(resolve(rel))) return rel;
-  }
-  return null;
-}
-async function initCommand(options, globalOptions) {
-  const spinner3 = createSpinner("Collecting project information");
-  let envName, databaseUrl, migrationsPath;
-  if (options.yes) {
-    envName = options.envName || "development";
-    const detectedDb = await findDatabaseUrl(envName);
-    databaseUrl = options.dbUrl || detectedDb;
-    if (!databaseUrl) {
-      spinner3.fail("Database connection string is required. Please provide it with --db-url.");
-      throw new Error("FLOW_MISSING_DB_NON_INTERACTIVE");
-    }
-    const detectedPath = await detectMigrationsDir();
-    migrationsPath = options.migrationsPath || detectedPath || "./migrations";
-  } else {
-    const envNameInput = await textInput("Environment name", {
-      placeholder: "development",
-      defaultValue: "development"
-    });
-    envName = envNameInput?.trim() || "development";
-    const defaultDb = await findDatabaseUrl(envName);
-    const dbPrompt = "Database connection string (e.g. postgresql://user:pass@localhost:5432/db)";
-    const dbInput = await textInput(dbPrompt, {
-      placeholder: defaultDb || "postgresql://user:pass@localhost:5432/db",
-      defaultValue: defaultDb
-    });
-    databaseUrl = (dbInput?.trim() || defaultDb).trim();
-    if (!databaseUrl) {
-      spinner3.fail("Database connection string is required");
-      throw new Error("FLOW_MISSING_DB");
-    }
-    const detectedPath = await detectMigrationsDir() || "./migrations";
-    const migInput = await textInput("Path to migrations folder", {
-      placeholder: detectedPath,
-      defaultValue: detectedPath
-    });
-    migrationsPath = migInput?.trim() || detectedPath;
-    const proceed = await confirmAction("Generate configuration with these values?");
-    if (!proceed) {
-      spinner3.fail("User cancelled");
-      return;
-    }
-  }
-  spinner3.update("Generating flow.config");
-  const dbTypeMatch = databaseUrl.split(":")[0];
-  const config = {
-    version: "0.1.0",
-    defaultEnvironment: envName,
-    environments: {
-      [envName]: {
-        databaseUrl,
-        migrationsPath
-      }
-    },
-    safety: {
-      maxTableSizeMB: 1024,
-      maxLockTimeMs: 3e5
-    },
-    database: {
-      default: {
-        type: dbTypeMatch
-      }
-    }
-  };
-  const configPath = resolve(globalOptions.config || "flow.config.json");
-  if (await fsExtra.pathExists(configPath) && !options.yes && !await confirmAction(`Overwrite existing ${configPath}?`)) {
-    spinner3.fail("Init aborted \u2013 config exists");
-    return;
-  }
-  if (!globalOptions.dryRun) {
-    await fsExtra.writeFile(configPath, JSON.stringify(config, null, 2));
-    spinner3.succeed(`Configuration written to ${configPath}`);
-  } else {
-    spinner3.succeed("Dry run complete \u2013 configuration would be:");
-    console.log(JSON.stringify(config, null, 2));
-  }
-  try {
-    const pkgPath = resolve("package.json");
-    if (await fsExtra.pathExists(pkgPath)) {
-      const fsmod = await import("fs-extra");
-      const fsDyn = fsmod.default ?? fsmod;
-      const pkg = await fsDyn.readJson(pkgPath);
-      pkg.scripts = pkg.scripts || {};
-      if (!pkg.scripts.flow) {
-        pkg.scripts.flow = "flow";
-        await fsDyn.writeJson(pkgPath, pkg, { spaces: 2 });
-        spinner3.update('Added "flow" script to package.json');
-      }
-    }
-  } catch (err) {
-    console.warn("\u26A0\uFE0F  Could not update package.json:", err instanceof Error ? err.message : err);
-  }
-}
-
-// src/commands/sync.ts
-import { confirm as confirm2 } from "@clack/prompts";
-
-// src/lib/config.ts
-import fsExtra2 from "fs-extra";
-import { resolve as resolve2, dirname } from "path";
-async function getFlowConfig(global) {
-  const configPath = await findConfigFile(process.cwd(), global.config);
-  return JSON.parse(await fsExtra2.readFile(configPath, "utf8"));
-}
-async function findConfigFile(startDir, explicit) {
-  if (explicit) {
-    const p = resolve2(explicit);
-    if (await fsExtra2.pathExists(p)) return p;
-    throw new Error(`Config file not found at ${p}`);
-  }
-  let dir = startDir;
-  while (true) {
-    const candidate = resolve2(dir, "flow.config.json");
-    if (await fsExtra2.pathExists(candidate)) return candidate;
-    const parent = dirname(dir);
-    if (parent === dir) break;
-    dir = parent;
-  }
-  throw new Error("flow.config.json not found");
-}
 
 // ../../packages/analyzer/src/orm-detectors/base-detector.ts
 import { join } from "path";
@@ -531,8 +360,8 @@ var DrizzleDetector = class extends BaseORMDetector {
       }
       const configFile = configFilesFound[0];
       const configContent = await fs.readFile(configFile.absolute, "utf-8");
-      const driver = this.extractConfigValue(configContent, "driver") || "pg";
-      const validDrivers = ["pg", "mysql2", "better-sqlite3"];
+      const driver = this.extractConfigValue(configContent, "dialect") || "pg";
+      const validDrivers = ["pg", "mysql2", "better-sqlite3", "sqlite"];
       const mappedDriver = validDrivers.includes(driver) ? driver : "pg";
       const config = {
         type: "drizzle",
@@ -772,20 +601,200 @@ var TypeORMDetector = class extends BaseORMDetector {
   }
 };
 
+// src/commands/init.ts
+async function findDatabaseUrl(envName, projectPath) {
+  const candidateFiles = [];
+  candidateFiles.push(resolve(projectPath, ".env"));
+  const parts = projectPath.split("/");
+  for (let i = parts.length - 1; i > 0; i--) {
+    candidateFiles.push(parts.slice(0, i + 1).join("/") + "/.env");
+  }
+  const appsDir = resolve(projectPath, "apps");
+  const pkgsDir = resolve(projectPath, "packages");
+  if (await fsExtra.pathExists(appsDir)) {
+    const sub = await fsExtra.readdir(appsDir);
+    sub.forEach((s) => candidateFiles.push(resolve(appsDir, s, ".env")));
+  }
+  if (await fsExtra.pathExists(pkgsDir)) {
+    const sub = await fsExtra.readdir(pkgsDir);
+    sub.forEach((s) => candidateFiles.push(resolve(pkgsDir, s, ".env")));
+  }
+  for (const file of candidateFiles) {
+    if (await fsExtra.pathExists(file)) {
+      try {
+        const envVars = dotenv.parse(await fsExtra.readFile(file));
+        const v = envVars.DATABASE_URL || envVars[`DATABASE_URL_${envName.toUpperCase()}`];
+        if (v) return v;
+      } catch {
+      }
+    }
+  }
+  return "";
+}
+async function detectMigrationsDir(projectPath) {
+  const candidates = [
+    "migrations",
+    "db/migrations",
+    "drizzle/migrations",
+    "prisma/migrations",
+    "database/migrations"
+  ];
+  const drizzleConfigFiles = ["drizzle.config.ts", "drizzle.config.js", "drizzle.config.mjs", "drizzle.config.cjs"];
+  for (const f of drizzleConfigFiles) {
+    if (await fsExtra.pathExists(resolve(projectPath, f))) {
+      const content = await fsExtra.readFile(resolve(projectPath, f), "utf8");
+      const match = content.match(/out\s*:\s*["'`](.+?)["'`]/);
+      if (match) {
+        candidates.unshift(match[1]);
+      }
+    }
+  }
+  for (const rel of candidates) {
+    if (await fsExtra.pathExists(resolve(projectPath, rel))) return rel;
+  }
+  return null;
+}
+async function initCommand(options, globalOptions) {
+  const projectPath = resolve(options.project || process.cwd());
+  const spinner3 = createSpinner("Collecting project information");
+  let envName, databaseUrl, migrationsPath;
+  if (options.yes) {
+    envName = options.envName || "development";
+    const detectedDb = await findDatabaseUrl(envName, projectPath);
+    databaseUrl = options.dbUrl || detectedDb;
+    if (!databaseUrl) {
+      spinner3.fail("Database connection string is required. Please provide it with --db-url.");
+      throw new Error("FLOW_MISSING_DB_NON_INTERACTIVE");
+    }
+    const detectedPath = await detectMigrationsDir(projectPath);
+    migrationsPath = options.migrationsPath || detectedPath || "./migrations";
+  } else {
+    const envNameInput = await textInput("Environment name", {
+      placeholder: "development",
+      defaultValue: "development"
+    });
+    envName = envNameInput?.trim() || "development";
+    const defaultDb = await findDatabaseUrl(envName, projectPath);
+    const dbPrompt = "Database connection string (e.g. postgresql://user:pass@localhost:5432/db)";
+    const dbInput = await textInput(dbPrompt, {
+      placeholder: defaultDb || "postgresql://user:pass@localhost:5432/db",
+      defaultValue: defaultDb
+    });
+    databaseUrl = (dbInput?.trim() || defaultDb).trim();
+    if (!databaseUrl) {
+      spinner3.fail("Database connection string is required");
+      throw new Error("FLOW_MISSING_DB");
+    }
+    const detectedPath = await detectMigrationsDir(projectPath) || "./migrations";
+    const migInput = await textInput("Path to migrations folder", {
+      placeholder: detectedPath,
+      defaultValue: detectedPath
+    });
+    migrationsPath = migInput?.trim() || detectedPath;
+    const proceed = await confirmAction("Generate configuration with these values?");
+    if (!proceed) {
+      spinner3.fail("User cancelled");
+      return;
+    }
+  }
+  spinner3.update("Generating flow.config");
+  const detectors = [
+    { name: "prisma", detector: new PrismaDetector() },
+    { name: "drizzle", detector: new DrizzleDetector() },
+    { name: "typeorm", detector: new TypeORMDetector() }
+  ];
+  let detectedORM = null;
+  for (const { name, detector } of detectors) {
+    const result = await detector.detect(projectPath);
+    if (result.found) {
+      detectedORM = name;
+      break;
+    }
+  }
+  const config = {
+    version: "0.1.0",
+    defaultEnvironment: envName,
+    ...detectedORM && { orm: detectedORM },
+    environments: {
+      [envName]: {
+        db_connection_string: databaseUrl,
+        migrationsPath
+      }
+    },
+    safety: {
+      maxTableSizeMB: 1024,
+      maxLockTimeMs: 3e5
+    }
+  };
+  const configPath = resolve(projectPath, globalOptions.config || "flow.config.json");
+  if (await fsExtra.pathExists(configPath) && !options.yes && !await confirmAction(`Overwrite existing ${configPath}?`)) {
+    spinner3.fail("Init aborted \u2013 config exists");
+    return;
+  }
+  if (!globalOptions.dryRun) {
+    await fsExtra.writeFile(configPath, JSON.stringify(config, null, 2));
+    spinner3.succeed(`Configuration written to ${configPath}`);
+  } else {
+    spinner3.succeed("Dry run complete \u2013 configuration would be:");
+    console.log(JSON.stringify(config, null, 2));
+  }
+  try {
+    const pkgPath = resolve(projectPath, "package.json");
+    if (await fsExtra.pathExists(pkgPath)) {
+      const fsmod = await import("fs-extra");
+      const fsDyn = fsmod.default ?? fsmod;
+      const pkg = await fsDyn.readJson(pkgPath);
+      pkg.scripts = pkg.scripts || {};
+      if (!pkg.scripts.flow) {
+        pkg.scripts.flow = "flow";
+        await fsDyn.writeJson(pkgPath, pkg, { spaces: 2 });
+        spinner3.update('Added "flow" script to package.json');
+      }
+    }
+  } catch (err) {
+    console.warn("\u26A0\uFE0F  Could not update package.json:", err instanceof Error ? err.message : err);
+  }
+}
+
+// src/commands/sync.ts
+import { confirm as confirm2 } from "@clack/prompts";
+
+// src/lib/config.ts
+import fsExtra2 from "fs-extra";
+import { resolve as resolve2, dirname } from "path";
+async function getFlowConfig(global, projectPath) {
+  const configPath = await findConfigFile(projectPath || process.cwd(), global.config);
+  return JSON.parse(await fsExtra2.readFile(configPath, "utf8"));
+}
+async function findConfigFile(startDir, explicit) {
+  if (explicit) {
+    const p = resolve2(explicit);
+    if (await fsExtra2.pathExists(p)) return p;
+    throw new Error(`Config file not found at ${p}`);
+  }
+  let dir = startDir;
+  while (true) {
+    const candidate = resolve2(dir, "flow.config.json");
+    if (await fsExtra2.pathExists(candidate)) return candidate;
+    const parent = dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  throw new Error("flow.config.json not found");
+}
+
 // src/commands/sync.ts
 import { EnhancementEngine } from "@driftjs/enhancer";
 import fs3 from "fs-extra";
 import path from "path";
 import { diffChars } from "diff";
 import pc from "picocolors";
-import { exec } from "child_process";
-import { promisify } from "util";
-var execAsync = promisify(exec);
+import { execa } from "execa";
 async function syncCommand(options, globalOptions) {
   const spinner3 = createSpinner("Detecting ORM setup and analyzing schema changes...");
-  const cfg = await getFlowConfig(globalOptions);
+  const projectPath = options.project ? path.resolve(options.project) : process.cwd();
+  const cfg = await getFlowConfig(globalOptions, projectPath);
   const envCfg = cfg.environments[cfg.defaultEnvironment];
-  const projectPath = process.cwd();
   let detectedORM = null;
   const detectors = [
     { name: "prisma", detector: new PrismaDetector() },
@@ -826,10 +835,10 @@ async function syncCommand(options, globalOptions) {
   const absoluteMigrationsDir = path.resolve(projectPath, migrationsDir);
   if (hasChanges) {
     spinner3.update("Generating migration plan for schema changes...");
-    await handleSchemaChanges(detectedORM, ormConfig, absoluteMigrationsDir, globalOptions);
+    await handleSchemaChanges(detectedORM, ormConfig, absoluteMigrationsDir, globalOptions, projectPath, options);
   } else {
     spinner3.update("Analyzing existing migrations for enhancements...");
-    await enhanceExistingMigrations(absoluteMigrationsDir, globalOptions);
+    await enhanceExistingMigrations(absoluteMigrationsDir, globalOptions, options);
   }
   spinner3.succeed("Sync completed");
 }
@@ -852,9 +861,9 @@ async function checkPrismaChanges(config, projectPath) {
     if (!await fs3.pathExists(schemaPath)) return false;
     if (!await fs3.pathExists(migrationsPath)) return true;
     try {
-      await execAsync("npx prisma migrate status", { cwd: projectPath });
+      await execa("npx prisma migrate status", { cwd: projectPath });
       try {
-        const { stdout } = await execAsync("npx prisma migrate diff --from-migrations ./prisma/migrations --to-schema-datamodel ./prisma/schema.prisma", { cwd: projectPath });
+        const { stdout } = await execa("npx prisma migrate diff --from-migrations ./prisma/migrations --to-schema-datamodel ./prisma/schema.prisma", { cwd: projectPath });
         return stdout.trim().length > 0;
       } catch {
         return true;
@@ -876,40 +885,12 @@ async function checkPrismaChanges(config, projectPath) {
   }
 }
 async function checkDrizzleChanges(config, projectPath) {
-  try {
-    await execAsync("npx drizzle-kit check", { cwd: projectPath });
-    return false;
-  } catch (error) {
-    if (error.code === 1) {
-      return true;
-    }
-    console.warn("drizzle-kit check failed, falling back to file-based change detection.");
-    const schemaFiles = ["src/db/schema.ts", "src/schema.ts", "db/schema.ts", "schema.ts", "src/lib/db/schema.ts"];
-    const migrationsDir = config?.outDir || "./drizzle";
-    const migrationsDirPath = path.join(projectPath, migrationsDir);
-    if (!await fs3.pathExists(migrationsDirPath)) return true;
-    for (const schemaFile of schemaFiles) {
-      const schemaPath = path.join(projectPath, schemaFile);
-      if (await fs3.pathExists(schemaPath)) {
-        const schemaStats = await fs3.stat(schemaPath);
-        const migrationFiles = await fs3.readdir(migrationsDirPath);
-        const sqlFiles = migrationFiles.filter((f) => f.endsWith(".sql"));
-        if (sqlFiles.length === 0) return true;
-        const latestMigration = sqlFiles.sort().pop();
-        const latestMigrationPath = path.join(migrationsDirPath, latestMigration);
-        const migrationStats = await fs3.stat(latestMigrationPath);
-        if (schemaStats.mtime > migrationStats.mtime) {
-          return true;
-        }
-      }
-    }
-    return false;
-  }
+  return true;
 }
 async function checkTypeORMChanges(config, projectPath) {
   try {
     try {
-      const { stdout } = await execAsync("npx typeorm migration:show", { cwd: projectPath });
+      const { stdout } = await execa("npx typeorm migration:show", { cwd: projectPath });
       return !stdout.includes("No migrations are pending");
     } catch {
       const entityDirs = ["src/entities", "src/entity", "entities"];
@@ -942,7 +923,7 @@ async function checkTypeORMChanges(config, projectPath) {
     return false;
   }
 }
-async function handleSchemaChanges(orm, config, migrationsDir, globalOptions) {
+async function handleSchemaChanges(orm, config, migrationsDir, globalOptions, projectPath, options) {
   const migrationName = `flow_change_${Date.now()}`;
   let generateCmd = "";
   switch (orm) {
@@ -951,13 +932,6 @@ async function handleSchemaChanges(orm, config, migrationsDir, globalOptions) {
       break;
     case "drizzle":
       generateCmd = `npx drizzle-kit generate`;
-      if (config?.driver === "mysql2") {
-        generateCmd += " --dialect=mysql";
-      } else if (config?.driver === "pg") {
-        generateCmd += " --dialect=postgresql";
-      } else {
-        generateCmd += " --dialect=sqlite";
-      }
       break;
     case "typeorm":
       const migPath = path.join(migrationsDir, migrationName);
@@ -966,13 +940,13 @@ async function handleSchemaChanges(orm, config, migrationsDir, globalOptions) {
   }
   const spinner3 = createSpinner(`Running ${orm} to generate migration...`);
   try {
-    const { stdout, stderr } = await execAsync(generateCmd, { cwd: process.cwd() });
+    const { stdout, stderr } = await execa(generateCmd, { cwd: projectPath, shell: true });
     if (globalOptions.debug) {
       console.log(stdout);
       if (stderr) console.error(pc.yellow(stderr));
     }
     spinner3.succeed("ORM migration generated successfully.");
-    await enhanceExistingMigrations(migrationsDir, globalOptions);
+    await enhanceExistingMigrations(migrationsDir, globalOptions, options);
   } catch (error) {
     spinner3.fail("Migration generation failed.");
     console.error(pc.red(error.stderr || error.message));
@@ -980,7 +954,7 @@ async function handleSchemaChanges(orm, config, migrationsDir, globalOptions) {
 ${generateCmd}`));
   }
 }
-async function enhanceExistingMigrations(migrationsDir, globalOptions) {
+async function enhanceExistingMigrations(migrationsDir, globalOptions, options) {
   const spinner3 = createSpinner("Analyzing migrations for enhancements...");
   if (!await fs3.pathExists(migrationsDir)) {
     spinner3.fail(`Migrations directory not found: ${migrationsDir}`);
@@ -1021,7 +995,7 @@ async function enhanceExistingMigrations(migrationsDir, globalOptions) {
       console.log(pc.bold(`
 Enhancements for ${file}:`));
       console.log(diffOutput);
-      const proceed = await confirm2({ message: `Apply these enhancements to ${file}?` });
+      const proceed = options.yes ? true : await confirm2({ message: `Apply these enhancements to ${file}?` });
       if (proceed) {
         try {
           const newContent = await replaceEnhancedSQLInMigrationFile(filePath, enhanced.enhanced.up, enhanced.enhanced.down);
@@ -1043,6 +1017,7 @@ Enhancements for ${file}:`));
       console.log(pc.gray("No enhancements needed."));
     }
   }
+  spinner3.succeed("Enhancement analysis completed.");
 }
 function extractSQLFromMigrationFile(content) {
   const sqlPatterns = [
@@ -1073,10 +1048,12 @@ async function replaceEnhancedSQLInMigrationFile(filePath, upSQL, downSQL) {
 
 // src/commands/test.ts
 import { spinner as spinner2 } from "@clack/prompts";
+import path2 from "path";
 async function testCommand(options, globalOptions) {
   const s = spinner2();
-  const cfg = await getFlowConfig(globalOptions);
-  if (globalOptions.verbose) {
+  const projectPath = options.project ? path2.resolve(options.project) : process.cwd();
+  const cfg = await getFlowConfig(globalOptions, projectPath);
+  if (globalOptions.debug) {
     console.log("Testing migrations against env:", cfg.defaultEnvironment);
   }
   s.start("Running migration tests...");
@@ -1088,15 +1065,14 @@ async function testCommand(options, globalOptions) {
 // src/commands/apply.ts
 import { confirm as confirm3 } from "@clack/prompts";
 import fs4 from "fs-extra";
-import path2 from "path";
+import path3 from "path";
 import pc2 from "picocolors";
 import { Client as PgClient } from "pg";
 import mysql from "mysql2/promise";
 import sqlite3 from "sqlite3";
 async function applyCommand(options, globalOptions) {
-  console.log("applyCommand started");
-  const cfg = await getFlowConfig(globalOptions);
-  console.log("got flow config");
+  const projectPath = options.project ? path3.resolve(options.project) : process.cwd();
+  const cfg = await getFlowConfig(globalOptions, projectPath);
   const envCfg = cfg.environments[cfg.defaultEnvironment];
   if (globalOptions.debug) {
     console.log("Applying migration using env:", cfg.defaultEnvironment);
@@ -1120,7 +1096,7 @@ async function applyCommand(options, globalOptions) {
     console.log("ensured migrations table");
     spinner3.update("Finding migrations to apply...");
     const migrationsDir = envCfg.migrationsPath || "./migrations";
-    const absoluteMigrationsDir = path2.resolve(process.cwd(), migrationsDir);
+    const absoluteMigrationsDir = path3.resolve(projectPath, migrationsDir);
     const pendingMigrations = await findPendingMigrations(connection, absoluteMigrationsDir, options.migration);
     console.log("found pending migrations");
     if (pendingMigrations.length === 0) {
@@ -1143,7 +1119,7 @@ ${pc2.cyan(`--- ${migration.name} ---`)}`);
       }
       return;
     }
-    const proceed = await confirm3({
+    const proceed = options.yes ? true : await confirm3({
       message: `Apply ${pendingMigrations.length} migration(s) to the database?`
     });
     console.log("confirmed apply");
@@ -1257,14 +1233,14 @@ async function findPendingMigrations(connection, migrationsDir, targetMigration)
   const migrationFiles = allFiles.filter((f) => f.endsWith(".sql") || f.endsWith(".ts") || f.endsWith(".js")).sort();
   const pendingMigrations = [];
   for (const file of migrationFiles) {
-    const migrationName = path2.parse(file).name;
+    const migrationName = path3.parse(file).name;
     if (appliedNames.has(migrationName)) {
       continue;
     }
     if (targetMigration && migrationName !== targetMigration) {
       continue;
     }
-    const filePath = path2.join(migrationsDir, file);
+    const filePath = path3.join(migrationsDir, file);
     let content = await fs4.readFile(filePath, "utf-8");
     if (file.endsWith(".ts") || file.endsWith(".js")) {
       content = extractSQLFromMigrationFile2(content);
@@ -1355,13 +1331,14 @@ function extractSQLFromMigrationFile2(content) {
 // src/commands/back.ts
 import { confirm as confirm4 } from "@clack/prompts";
 import fs5 from "fs-extra";
-import path3 from "path";
+import path4 from "path";
 import pc3 from "picocolors";
 import { Client as PgClient2 } from "pg";
 import mysql2 from "mysql2/promise";
-import Database from "better-sqlite3";
+import sqlite32 from "sqlite3";
 async function backCommand(options, globalOptions) {
-  const cfg = await getFlowConfig(globalOptions);
+  const projectPath = options.project ? path4.resolve(options.project) : process.cwd();
+  const cfg = await getFlowConfig(globalOptions, projectPath);
   const envCfg = cfg.environments[cfg.defaultEnvironment];
   if (globalOptions.debug) {
     console.log("Rolling back using env:", cfg.defaultEnvironment);
@@ -1388,7 +1365,8 @@ async function backCommand(options, globalOptions) {
     const migrationsToRollback = await determineMigrationsToRollback(
       appliedMigrations,
       options,
-      envCfg
+      envCfg,
+      projectPath
     );
     if (migrationsToRollback.length === 0) {
       console.log(pc3.yellow("\u26A0\uFE0F  No migrations selected for rollback"));
@@ -1404,7 +1382,7 @@ async function backCommand(options, globalOptions) {
       for (const migration of migrationsToRollback) {
         console.log(`
 ${pc3.cyan(`--- Rollback ${migration.name} ---`)}`);
-        const downContent = await findDownMigration(migration, envCfg);
+        const downContent = await findDownMigration(migration, envCfg, projectPath);
         if (downContent) {
           console.log(pc3.gray(downContent));
         } else {
@@ -1422,7 +1400,7 @@ ${pc3.cyan(`--- Rollback ${migration.name} ---`)}`);
         console.log(`  \u2022 ${pc3.red(m.name)}`);
       });
     }
-    const proceed = await confirm4({
+    const proceed = options.yes ? true : await confirm4({
       message: riskyMigrations.length > 0 ? pc3.red("\u26A0\uFE0F  Are you sure you want to rollback these potentially destructive migrations?") : `Rollback ${migrationsToRollback.length} migration(s)?`
     });
     if (!proceed) {
@@ -1433,7 +1411,7 @@ ${pc3.cyan(`--- Rollback ${migration.name} ---`)}`);
     for (const migration of migrationsToRollback) {
       try {
         rollbackSpinner.update(`Rolling back ${migration.name}...`);
-        const downContent = await findDownMigration(migration, envCfg);
+        const downContent = await findDownMigration(migration, envCfg, projectPath);
         if (downContent) {
           await executeMigrationRollback(connection, downContent);
         } else {
@@ -1466,35 +1444,25 @@ ${pc3.cyan(`--- Rollback ${migration.name} ---`)}`);
   }
 }
 async function connectToDatabase2(envCfg) {
-  const dbConfig = envCfg.database;
-  if (!dbConfig) {
-    throw new Error("Database configuration not found in flow.config.json");
+  const connectionString = envCfg.db_connection_string || envCfg.databaseUrl;
+  if (!connectionString) {
+    throw new Error('Database connection string not found in flow.config.json. Please provide "db_connection_string" or "databaseUrl".');
   }
-  switch (dbConfig.type) {
+  const dbType = connectionString.split(":")[0];
+  switch (dbType) {
     case "postgresql":
-      const pgClient = new PgClient2({
-        host: dbConfig.host,
-        port: dbConfig.port || 5432,
-        database: dbConfig.database,
-        user: dbConfig.user,
-        password: dbConfig.password
-      });
+      const pgClient = new PgClient2({ connectionString });
       await pgClient.connect();
       return { type: "postgresql", client: pgClient };
     case "mysql":
-      const mysqlConnection = await mysql2.createConnection({
-        host: dbConfig.host,
-        port: dbConfig.port || 3306,
-        database: dbConfig.database,
-        user: dbConfig.user,
-        password: dbConfig.password
-      });
+      const mysqlConnection = await mysql2.createConnection(connectionString);
       return { type: "mysql", client: mysqlConnection };
     case "sqlite":
-      const sqliteDb = new Database(dbConfig.database || "./database.db");
+      const sqlitePath = connectionString.substring("sqlite:".length);
+      const sqliteDb = new sqlite32.Database(sqlitePath || "./database.db");
       return { type: "sqlite", client: sqliteDb };
     default:
-      throw new Error(`Unsupported database type: ${dbConfig.type}`);
+      throw new Error(`Unsupported database type: ${dbType}`);
   }
 }
 async function getAppliedMigrations(connection) {
@@ -1508,7 +1476,7 @@ async function getAppliedMigrations(connection) {
     return [];
   }
 }
-async function determineMigrationsToRollback(appliedMigrations, options, envCfg) {
+async function determineMigrationsToRollback(appliedMigrations, options, envCfg, projectPath) {
   if (options.to) {
     const targetIndex = appliedMigrations.findIndex((m) => m.name === options.to);
     if (targetIndex === -1) {
@@ -1518,7 +1486,7 @@ async function determineMigrationsToRollback(appliedMigrations, options, envCfg)
   }
   const steps = options.steps || 1;
   if (steps >= appliedMigrations.length) {
-    const confirmAll = await confirm4({
+    const confirmAll = options.yes ? true : await confirm4({
       message: pc3.yellow(`\u26A0\uFE0F  This will rollback ALL ${appliedMigrations.length} migrations. Continue?`)
     });
     if (!confirmAll) {
@@ -1528,18 +1496,16 @@ async function determineMigrationsToRollback(appliedMigrations, options, envCfg)
   }
   return appliedMigrations.slice(0, steps);
 }
-async function findDownMigration(migration, envCfg) {
+async function findDownMigration(migration, envCfg, projectPath) {
   const migrationsDir = envCfg.migrationsPath || "./migrations";
-  const absoluteMigrationsDir = path3.resolve(process.cwd(), migrationsDir);
-  const possibleFiles = [
-    `${migration.name}.sql`,
-    `${migration.name}.ts`,
-    `${migration.name}.js`,
-    `${migration.name}_down.sql`,
-    `down_${migration.name}.sql`
-  ];
-  for (const filename of possibleFiles) {
-    const filePath = path3.join(absoluteMigrationsDir, filename);
+  const absoluteMigrationsDir = path4.resolve(projectPath, migrationsDir);
+  const files = await fs5.readdir(absoluteMigrationsDir);
+  for (const filename of files) {
+    const filePath = path4.join(absoluteMigrationsDir, filename);
+    const stat = await fs5.stat(filePath);
+    if (stat.isDirectory()) {
+      continue;
+    }
     if (await fs5.pathExists(filePath)) {
       let content = await fs5.readFile(filePath, "utf-8");
       if (filename.endsWith(".ts") || filename.endsWith(".js")) {
@@ -1588,12 +1554,21 @@ async function executeQuery2(connection, query, params) {
       const [mysqlResult] = await connection.client.execute(query, params);
       return Array.isArray(mysqlResult) ? mysqlResult : [mysqlResult];
     case "sqlite":
-      if (params) {
-        const stmt = connection.client.prepare(query);
-        return query.toLowerCase().includes("select") ? stmt.all(params) : [stmt.run(params)];
-      } else {
-        return query.toLowerCase().includes("select") ? connection.client.prepare(query).all() : [connection.client.exec(query)];
-      }
+      return new Promise((resolve3, reject) => {
+        const callback = (err, rows) => {
+          if (err) {
+            reject(err);
+          } else {
+            resolve3(rows);
+          }
+        };
+        if (query.toLowerCase().trim().startsWith("select")) {
+          connection.client.all(query, params, callback);
+        } else {
+          connection.client.run(query, params, callback);
+          resolve3([]);
+        }
+      });
     default:
       throw new Error(`Unsupported database type: ${connection.type}`);
   }
@@ -1654,22 +1629,22 @@ var handleCommand = async (commandPromise) => {
 };
 var program = new Command();
 program.name("flow").description("Enhanced database migration CLI tool for production-safety").version(version, "-v, --version", "Output the current version").option("-d, --debug", "Enable verbose logging").option("-c, --config <path>", "Path to flow.config.json", "./flow.config.json").option("--dry-run", "Show what would be done without executing");
-program.command("init").description("Initialize flow configuration in current project").option("--env-name <name>", "Name for the initial environment", "development").option("--db-url <url>", "Database connection string").option("--migrations-path <path>", "Path to the migrations folder").option("-y, --yes", "Skip interactive prompts and use default or provided values").action(async (options) => {
+program.command("init").description("Initialize flow configuration in current project").option("--project <path>", "Path to the project directory").option("--env-name <name>", "Name for the initial environment", "development").option("--db-url <url>", "Database connection string").option("--migrations-path <path>", "Path to the migrations folder").option("-y, --yes", "Skip interactive prompts and use default or provided values").action(async (options) => {
   intro("\u{1F30A} DriftJS Flow - Initialize");
   await handleCommand(initCommand(options, program.opts()));
   outro("\u2705 Flow configuration initialized successfully!");
 });
-program.command("sync").description("Analyse schema and create migration plan").option("-f, --force", "Force re-analysis of existing migrations even if no schema changes detected").option("--orm <type>", "Specify ORM type (prisma|drizzle|typeorm|auto)", "auto").action(async (options) => {
+program.command("sync").description("Detect ORM changes and create enhanced migration plan").option("--force", "Force re-analysis of existing migrations").option("--orm <name>", "Specify ORM (prisma, drizzle, typeorm, auto)", "auto").option("--project <path>", "Path to the project directory").option("-y, --yes", "Skip interactive prompts and use default or provided values").action(async (options) => {
   intro("\u{1F30A} DriftJS Flow - Sync");
   await handleCommand(syncCommand(options, program.opts()));
   outro("\u2705 Sync completed");
 });
-program.command("apply").description("Apply pending migrations to the database").option("--migration <name>", "Apply a specific migration by name").option("--target <name>", "Apply migrations up to and including the target migration").action(async (options) => {
+program.command("apply").description("Apply pending migrations to the database").option("--migration <name>", "Apply a specific migration by name").option("--target <name>", "Apply migrations up to and including the target migration").option("--project <path>", "Path to the project directory").option("-y, --yes", "Skip interactive prompts and use default or provided values").action(async (options) => {
   intro("\u{1F30A} DriftJS Flow - Apply");
   await handleCommand(applyCommand(options, program.opts()));
   outro("\u2705 Apply completed");
 });
-program.command("back").description("Rollback the latest migration batch").option("--steps <n>", "Number of migrations to rollback", "1").option("--to <name>", "Rollback to a specific migration (exclusive)").action(async (options) => {
+program.command("back").description("Rollback the latest migration batch").option("--steps <n>", "Number of migrations to rollback", "1").option("--to <name>", "Rollback to a specific migration (exclusive)").option("--project <path>", "Path to the project directory").option("-y, --yes", "Skip interactive prompts and use default or provided values").action(async (options) => {
   intro("\u{1F30A} DriftJS Flow - Rollback");
   if (options.steps) {
     options.steps = parseInt(options.steps, 10);
@@ -1677,6 +1652,6 @@ program.command("back").description("Rollback the latest migration batch").optio
   await handleCommand(backCommand(options, program.opts()));
   outro("\u2705 Rollback completed");
 });
-program.command("test").description("Run internal diagnostics").action(testCommand);
+program.command("test").description("Run internal diagnostics").option("--project <path>", "Path to the project directory").action(testCommand);
 program.parse();
 //# sourceMappingURL=index.js.map

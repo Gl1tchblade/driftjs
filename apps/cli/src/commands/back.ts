@@ -11,10 +11,13 @@ import pc from 'picocolors'
 import { Client as PgClient } from 'pg'
 import mysql from 'mysql2/promise'
 import Database from 'better-sqlite3'
+import sqlite3 from 'sqlite3'
 
 export interface BackOptions {
   steps?: number
   to?: string
+  project?: string
+  yes?: boolean
 }
 
 interface DatabaseConnection {
@@ -30,7 +33,8 @@ interface AppliedMigration {
 }
 
 export async function backCommand(options: BackOptions, globalOptions: GlobalOptions): Promise<void> {
-  const cfg = await getFlowConfig(globalOptions)
+  const projectPath = options.project ? path.resolve(options.project) : process.cwd()
+  const cfg = await getFlowConfig(globalOptions, projectPath)
   const envCfg = cfg.environments[cfg.defaultEnvironment]
   
   if (globalOptions.debug) {
@@ -67,7 +71,8 @@ export async function backCommand(options: BackOptions, globalOptions: GlobalOpt
     const migrationsToRollback = await determineMigrationsToRollback(
       appliedMigrations, 
       options, 
-      envCfg
+      envCfg,
+      projectPath
     )
     
     if (migrationsToRollback.length === 0) {
@@ -86,7 +91,7 @@ export async function backCommand(options: BackOptions, globalOptions: GlobalOpt
         console.log(`\n${pc.cyan(`--- Rollback ${migration.name} ---`)}`)
         
         // Try to find the DOWN migration content
-        const downContent = await findDownMigration(migration, envCfg)
+        const downContent = await findDownMigration(migration, envCfg, projectPath)
         if (downContent) {
           console.log(pc.gray(downContent))
         } else {
@@ -109,8 +114,8 @@ export async function backCommand(options: BackOptions, globalOptions: GlobalOpt
       })
     }
     
-    const proceed = await confirm({
-      message: riskyMigrations.length > 0 
+    const proceed = options.yes ? true : await confirm({
+      message: riskyMigrations.length > 0
         ? pc.red('⚠️  Are you sure you want to rollback these potentially destructive migrations?')
         : `Rollback ${migrationsToRollback.length} migration(s)?`
     })
@@ -127,7 +132,7 @@ export async function backCommand(options: BackOptions, globalOptions: GlobalOpt
       try {
         rollbackSpinner.update(`Rolling back ${migration.name}...`)
         
-        const downContent = await findDownMigration(migration, envCfg)
+        const downContent = await findDownMigration(migration, envCfg, projectPath)
         if (downContent) {
           await executeMigrationRollback(connection, downContent)
         } else {
@@ -169,40 +174,31 @@ export async function backCommand(options: BackOptions, globalOptions: GlobalOpt
 }
 
 async function connectToDatabase(envCfg: any): Promise<DatabaseConnection> {
-  const dbConfig = envCfg.database
-  
-  if (!dbConfig) {
-    throw new Error('Database configuration not found in flow.config.json')
+  const connectionString = envCfg.db_connection_string || envCfg.databaseUrl;
+
+  if (!connectionString) {
+    throw new Error('Database connection string not found in flow.config.json. Please provide "db_connection_string" or "databaseUrl".')
   }
-  
-  switch (dbConfig.type) {
+
+  const dbType = connectionString.split(':')[0];
+
+  switch (dbType) {
     case 'postgresql':
-      const pgClient = new PgClient({
-        host: dbConfig.host,
-        port: dbConfig.port || 5432,
-        database: dbConfig.database,
-        user: dbConfig.user,
-        password: dbConfig.password,
-      })
+      const pgClient = new PgClient({ connectionString })
       await pgClient.connect()
       return { type: 'postgresql', client: pgClient }
-      
+
     case 'mysql':
-      const mysqlConnection = await mysql.createConnection({
-        host: dbConfig.host,
-        port: dbConfig.port || 3306,
-        database: dbConfig.database,
-        user: dbConfig.user,
-        password: dbConfig.password,
-      })
+      const mysqlConnection = await mysql.createConnection(connectionString)
       return { type: 'mysql', client: mysqlConnection }
-      
+
     case 'sqlite':
-      const sqliteDb = new Database(dbConfig.database || './database.db')
+      const sqlitePath = connectionString.substring('sqlite:'.length);
+      const sqliteDb = new sqlite3.Database(sqlitePath || './database.db')
       return { type: 'sqlite', client: sqliteDb }
-      
+
     default:
-      throw new Error(`Unsupported database type: ${dbConfig.type}`)
+      throw new Error(`Unsupported database type: ${dbType}`)
   }
 }
 
@@ -222,7 +218,8 @@ async function getAppliedMigrations(connection: DatabaseConnection): Promise<App
 async function determineMigrationsToRollback(
   appliedMigrations: AppliedMigration[], 
   options: BackOptions,
-  envCfg: any
+  envCfg: any,
+  projectPath: string
 ): Promise<AppliedMigration[]> {
   if (options.to) {
     // Rollback to a specific migration (exclusive)
@@ -237,7 +234,7 @@ async function determineMigrationsToRollback(
   
   if (steps >= appliedMigrations.length) {
     // Confirm rolling back all migrations
-    const confirmAll = await confirm({
+    const confirmAll = options.yes ? true : await confirm({
       message: pc.yellow(`⚠️  This will rollback ALL ${appliedMigrations.length} migrations. Continue?`)
     })
     
@@ -251,21 +248,20 @@ async function determineMigrationsToRollback(
   return appliedMigrations.slice(0, steps)
 }
 
-async function findDownMigration(migration: AppliedMigration, envCfg: any): Promise<string | null> {
+async function findDownMigration(migration: AppliedMigration, envCfg: any, projectPath: string): Promise<string | null> {
   const migrationsDir = envCfg.migrationsPath || './migrations'
-  const absoluteMigrationsDir = path.resolve(process.cwd(), migrationsDir)
+  const absoluteMigrationsDir = path.resolve(projectPath, migrationsDir)
   
-  // Look for migration files that match this migration name
-  const possibleFiles = [
-    `${migration.name}.sql`,
-    `${migration.name}.ts`,
-    `${migration.name}.js`,
-    `${migration.name}_down.sql`,
-    `down_${migration.name}.sql`
-  ]
+  // Find the corresponding migration file
+  const files = await fs.readdir(absoluteMigrationsDir)
   
-  for (const filename of possibleFiles) {
+  for (const filename of files) {
     const filePath = path.join(absoluteMigrationsDir, filename)
+    const stat = await fs.stat(filePath);
+    if (stat.isDirectory()) {
+      continue;
+    }
+    
     if (await fs.pathExists(filePath)) {
       let content = await fs.readFile(filePath, 'utf-8')
       
@@ -332,12 +328,21 @@ async function executeQuery(connection: DatabaseConnection, query: string, param
       return Array.isArray(mysqlResult) ? mysqlResult : [mysqlResult]
       
     case 'sqlite':
-      if (params) {
-        const stmt = connection.client.prepare(query)
-        return query.toLowerCase().includes('select') ? stmt.all(params) : [stmt.run(params)]
-      } else {
-        return query.toLowerCase().includes('select') ? connection.client.prepare(query).all() : [connection.client.exec(query)]
-      }
+      return new Promise((resolve, reject) => {
+        const callback = (err: Error | null, rows: any[]) => {
+          if (err) {
+            reject(err)
+          } else {
+            resolve(rows)
+          }
+        }
+        if (query.toLowerCase().trim().startsWith('select')) {
+          connection.client.all(query, params, callback)
+        } else {
+          connection.client.run(query, params, callback)
+          resolve([]);
+        }
+      })
       
     default:
       throw new Error(`Unsupported database type: ${connection.type}`)

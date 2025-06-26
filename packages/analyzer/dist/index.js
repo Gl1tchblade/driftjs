@@ -320,8 +320,8 @@ var DrizzleDetector = class extends BaseORMDetector {
       }
       const configFile = configFilesFound[0];
       const configContent = await fs.readFile(configFile.absolute, "utf-8");
-      const driver = this.extractConfigValue(configContent, "driver") || "pg";
-      const validDrivers = ["pg", "mysql2", "better-sqlite3"];
+      const driver = this.extractConfigValue(configContent, "dialect") || "pg";
+      const validDrivers = ["pg", "mysql2", "better-sqlite3", "sqlite"];
       const mappedDriver = validDrivers.includes(driver) ? driver : "pg";
       const config = {
         type: "drizzle",

@@ -1,19 +1,15 @@
 {
   "version": "0.1.0",
   "defaultEnvironment": "development",
+  "orm": "drizzle",
   "environments": {
     "development": {
-      "databaseUrl": "sqlite:sqlite.db",
+      "db_connection_string": "postgresql://postgres:password@localhost:5432/postgres",
       "migrationsPath": "./migrations"
     }
   },
   "safety": {
     "maxTableSizeMB": 1024,
     "maxLockTimeMs": 300000
-  },
-  "database": {
-    "default": {
-      "type": "sqlite"
-    }
   }
 }
