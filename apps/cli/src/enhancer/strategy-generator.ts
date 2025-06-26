@@ -5,6 +5,7 @@
 
 import { DatabaseConnection, TableMetadata } from '../core/index.js'
 import { RiskAssessment, SQLRiskDetector } from './risk-detector.js'
+import { ENHANCEMENT_RULES, applyEnhancements } from './enhancement-strategies.js'
 
 export interface EnhancementStrategy {
   originalSQL: string
@@ -77,7 +78,7 @@ export class EnhancementStrategyGenerator {
   }
   
   /**
-   * Ultra-fast strategy generation using pattern-based enhancements
+   * Ultra-fast strategy generation using comprehensive enhancement rules
    */
   async generateStrategy(
     originalSQL: string, 
@@ -88,20 +89,18 @@ export class EnhancementStrategyGenerator {
       maxDowntime?: number // seconds
     }
   ): Promise<EnhancementStrategy> {
-    // Skip complex analysis for ultra-fast generation
-    const sqlLower = originalSQL.toLowerCase()
-    
-    // Ultra-fast pattern-based enhancement
-    const enhancedSteps = this.generateUltraFastSteps(originalSQL, sqlLower)
-    const rollbackStrategy = this.generateUltraFastRollback(originalSQL, sqlLower)
-    const preFlightChecks = this.generateUltraFastChecks(originalSQL, sqlLower)
-    const postMigrationValidation = this.generateUltraFastValidation(originalSQL, sqlLower)
+    // Use comprehensive enhancement rules for better coverage
+    const enhancedSteps = applyEnhancements(originalSQL)
+    const rollbackStrategy = this.generateUltraFastRollback(originalSQL, originalSQL.toLowerCase())
+    const preFlightChecks = this.generateUltraFastChecks(originalSQL, originalSQL.toLowerCase())
+    const postMigrationValidation = this.generateUltraFastValidation(originalSQL, originalSQL.toLowerCase())
     
     const estimatedDuration = enhancedSteps.reduce((total, step) => total + step.estimatedDuration, 0)
     const maintenanceWindow: MaintenanceWindow = {
-      required: estimatedDuration > 30,
-      recommendedDuration: estimatedDuration + 60,
-      optimalTime: 'off-peak'
+      recommended: estimatedDuration > 30,
+      minimumDuration: estimatedDuration,
+      optimalDuration: estimatedDuration + 60,
+      considerations: estimatedDuration > 300 ? ['Long-running operation - consider maintenance window'] : []
     }
     
     return {

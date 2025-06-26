@@ -17,6 +17,15 @@ const flowNav: NavGroup[] = [
     ],
   },
   {
+    label: "features",
+    children: [
+      { label: "enhancements", href: "/docs/flow/enhancements" },
+      { label: "safety patterns", href: "/docs/flow/safety" },
+      { label: "performance", href: "/docs/flow/performance" },
+      { label: "monitoring", href: "/docs/flow/monitoring" },
+    ],
+  },
+  {
     label: "commands",
     children: [
       { label: "generate", href: "/docs/flow/generate" },

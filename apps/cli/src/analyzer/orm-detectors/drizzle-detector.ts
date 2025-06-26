@@ -16,19 +16,22 @@ export class DrizzleDetector extends BaseORMDetector {
     const evidence: string[] = []
     
     try {
-      // Check for drizzle.config.ts/js files
-      const configFiles = [
-        'drizzle.config.ts',
-        'drizzle.config.js',
-        'drizzle.config.mjs'
-      ]
-      
-             const { existing: configFilesFound } = await this.checkFiles(projectPath, configFiles)
-       evidence.push(...configFilesFound.map(f => `Found config file: ${f.relative}`))
+      // Use recursive directory scanning to find config files
+      const configFilesFound = await this.findConfigFilesRecursively(projectPath)
+      evidence.push(...configFilesFound.map(f => `Found config file: ${f.relative}`))
        
-       // Check for package.json with drizzle dependencies
-       const deps = await this.checkPackageJsonDependencies(projectPath, ['drizzle-orm', 'drizzle-kit'])
-       evidence.push(...deps.found.map(dep => `Found dependency: ${dep}`))
+       // Check for package.json with drizzle dependencies - check root and config directories
+       let deps = await this.checkPackageJsonDependencies(projectPath, ['drizzle-orm', 'drizzle-kit'])
+       evidence.push(...deps.found.map(dep => `Found dependency: ${dep} (root)`))
+       
+       // Also check for dependencies in the same directory as any found config files
+       for (const configFile of configFilesFound) {
+         const configDir = path.dirname(configFile.absolute)
+         const configDeps = await this.checkPackageJsonDependencies(configDir, ['drizzle-orm', 'drizzle-kit'])
+         evidence.push(...configDeps.found.map(dep => `Found dependency: ${dep} (${configFile.relative})`))
+         // Merge the found dependencies
+         deps.found = [...new Set([...deps.found, ...configDeps.found])]
+       }
        
        // Check for common schema file patterns
        const schemaPatterns = [
@@ -48,17 +51,19 @@ export class DrizzleDetector extends BaseORMDetector {
        evidence.push(...migrationDirsFound.map(f => `Found migration directory: ${f.relative}`))
       
       // Calculate confidence using helper
-      const confidence = this.calculateConfidence({
+      const confidenceInput = {
         required: { 
           found: deps.found.length > 0 ? 1 : 0, 
           total: 1 
         },
         optional: { 
-          found: configFilesFound.length + schemaFiles.length + migrationDirsFound.length, 
-          total: configFiles.length + schemaPatterns.length + migrationDirs.length 
+          found: (configFilesFound.length > 0 ? 1 : 0) + (schemaFiles.length > 0 ? 1 : 0) + (migrationDirsFound.length > 0 ? 1 : 0), 
+          total: 3  // config files, schema files, migration dirs
         },
         negative: 0
-      })
+      }
+      
+      const confidence = this.calculateConfidence(confidenceInput)
       
       return {
         found: confidence > 0.3,
@@ -76,14 +81,8 @@ export class DrizzleDetector extends BaseORMDetector {
   
   async extractConfig(projectPath: string): Promise<DrizzleConfig | null> {
     try {
-      // Try to find drizzle config file
-      const configFiles = [
-        'drizzle.config.ts',
-        'drizzle.config.js',
-        'drizzle.config.mjs'
-      ]
-      
-      const { existing: configFilesFound } = await this.checkFiles(projectPath, configFiles)
+      // Use the same recursive search as detect method
+      const configFilesFound = await this.findConfigFilesRecursively(projectPath)
       if (configFilesFound.length === 0) {
         return null
       }
@@ -114,7 +113,6 @@ export class DrizzleDetector extends BaseORMDetector {
       
       return config
     } catch (error) {
-      console.warn(`Failed to extract Drizzle config: ${error}`)
       return null
     }
   }
@@ -154,7 +152,6 @@ export class DrizzleDetector extends BaseORMDetector {
         database: 'main'
       }
     } catch (error) {
-      console.warn(`Failed to extract database config: ${error}`)
       return null
     }
   }
@@ -170,5 +167,36 @@ export class DrizzleDetector extends BaseORMDetector {
     const regex = new RegExp(`^${key}\\s*=\\s*(.+)$`, 'm')
     const match = content.match(regex)
     return match?.[1]?.replace(/['"]/g, '').trim()
+  }
+
+  private async findConfigFilesRecursively(projectPath: string): Promise<Array<{absolute: string, relative: string}>> {
+    const configPatterns = /^drizzle\.config\.(ts|js|mjs)$/
+    const foundFiles: Array<{absolute: string, relative: string}> = []
+    
+    const searchDirectory = async (dir: string, currentPath: string = '') => {
+      try {
+        const items = await fs.readdir(dir, { withFileTypes: true })
+        
+        for (const item of items) {
+          const fullPath = path.join(dir, item.name)
+          const relativePath = path.join(currentPath, item.name)
+          
+          // Skip node_modules and .git directories for performance
+          if (item.isDirectory() && !['node_modules', '.git', '.next', 'dist', 'build'].includes(item.name)) {
+            await searchDirectory(fullPath, relativePath)
+          } else if (item.isFile() && configPatterns.test(item.name)) {
+            foundFiles.push({
+              absolute: fullPath,
+              relative: relativePath
+            })
+          }
+        }
+      } catch {
+        // Skip directories we can't read
+      }
+    }
+    
+    await searchDirectory(projectPath)
+    return foundFiles
   }
 } 

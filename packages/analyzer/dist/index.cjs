@@ -310,15 +310,39 @@ var DrizzleDetector = class extends BaseORMDetector {
   async detect(projectPath) {
     const evidence = [];
     try {
+      console.log(`\u{1F50D} Drizzle Detection starting in: ${projectPath}`);
       const configFiles = [
         "drizzle.config.ts",
         "drizzle.config.js",
         "drizzle.config.mjs"
       ];
-      const { existing: configFilesFound } = await this.checkFiles(projectPath, configFiles);
+      const monorepoConfigFiles = [
+        ...configFiles,
+        // root level
+        ...configFiles.map((f) => `apps/server/${f}`),
+        ...configFiles.map((f) => `apps/api/${f}`),
+        ...configFiles.map((f) => `packages/server/${f}`),
+        ...configFiles.map((f) => `packages/api/${f}`),
+        ...configFiles.map((f) => `backend/${f}`),
+        ...configFiles.map((f) => `server/${f}`)
+      ];
+      console.log(`\u{1F50D} Searching for config files:`, monorepoConfigFiles);
+      const { existing: configFilesFound } = await this.checkFiles(projectPath, monorepoConfigFiles);
+      console.log(`\u2705 Config files found:`, configFilesFound.map((f) => f.relative));
       evidence.push(...configFilesFound.map((f) => `Found config file: ${f.relative}`));
-      const deps = await this.checkPackageJsonDependencies(projectPath, ["drizzle-orm", "drizzle-kit"]);
-      evidence.push(...deps.found.map((dep) => `Found dependency: ${dep}`));
+      console.log(`\u{1F50D} Checking root dependencies in: ${projectPath}`);
+      let deps = await this.checkPackageJsonDependencies(projectPath, ["drizzle-orm", "drizzle-kit"]);
+      console.log(`\u{1F4E6} Root dependencies found:`, deps.found);
+      evidence.push(...deps.found.map((dep) => `Found dependency: ${dep} (root)`));
+      for (const configFile of configFilesFound) {
+        const configDir = import_path2.default.dirname(configFile.absolute);
+        console.log(`\u{1F50D} Checking dependencies in config dir: ${configDir}`);
+        const configDeps = await this.checkPackageJsonDependencies(configDir, ["drizzle-orm", "drizzle-kit"]);
+        console.log(`\u{1F4E6} Config dir dependencies found:`, configDeps.found);
+        evidence.push(...configDeps.found.map((dep) => `Found dependency: ${dep} (${configFile.relative})`));
+        deps.found = [.../* @__PURE__ */ new Set([...deps.found, ...configDeps.found])];
+      }
+      console.log(`\u{1F4E6} Total dependencies found:`, deps.found);
       const schemaPatterns = [
         "src/db/schema.ts",
         "src/schema.ts",
@@ -331,17 +355,23 @@ var DrizzleDetector = class extends BaseORMDetector {
       const migrationDirs = ["drizzle", "migrations", "drizzle/migrations"];
       const { existing: migrationDirsFound } = await this.checkFiles(projectPath, migrationDirs);
       evidence.push(...migrationDirsFound.map((f) => `Found migration directory: ${f.relative}`));
-      const confidence = this.calculateConfidence({
+      const confidenceInput = {
         required: {
           found: deps.found.length > 0 ? 1 : 0,
           total: 1
         },
         optional: {
-          found: configFilesFound.length + schemaFiles.length + migrationDirsFound.length,
-          total: configFiles.length + schemaPatterns.length + migrationDirs.length
+          found: (configFilesFound.length > 0 ? 1 : 0) + (schemaFiles.length > 0 ? 1 : 0) + (migrationDirsFound.length > 0 ? 1 : 0),
+          total: 3
+          // config files, schema files, migration dirs
         },
         negative: 0
-      });
+      };
+      console.log(`\u{1F3AF} Confidence calculation input:`, confidenceInput);
+      const confidence = this.calculateConfidence(confidenceInput);
+      console.log(`\u{1F3AF} Final confidence: ${confidence} (${Math.round(confidence * 100)}%)`);
+      console.log(`\u{1F3AF} Detection threshold: 30%`);
+      console.log(`\u{1F3AF} Will detect: ${confidence > 0.3}`);
       return {
         found: confidence > 0.3,
         confidence: Math.round(confidence * 100),
@@ -362,7 +392,17 @@ var DrizzleDetector = class extends BaseORMDetector {
         "drizzle.config.js",
         "drizzle.config.mjs"
       ];
-      const { existing: configFilesFound } = await this.checkFiles(projectPath, configFiles);
+      const monorepoConfigFiles = [
+        ...configFiles,
+        // root level
+        ...configFiles.map((f) => `apps/server/${f}`),
+        ...configFiles.map((f) => `apps/api/${f}`),
+        ...configFiles.map((f) => `packages/server/${f}`),
+        ...configFiles.map((f) => `packages/api/${f}`),
+        ...configFiles.map((f) => `backend/${f}`),
+        ...configFiles.map((f) => `server/${f}`)
+      ];
+      const { existing: configFilesFound } = await this.checkFiles(projectPath, monorepoConfigFiles);
       if (configFilesFound.length === 0) {
         return null;
       }

@@ -16,19 +16,50 @@ export class DrizzleDetector extends BaseORMDetector {
     const evidence: string[] = []
     
     try {
-      // Check for drizzle.config.ts/js files
+      console.log(`🔍 Drizzle Detection starting in: ${projectPath}`)
+      
+      // Check for drizzle.config.ts/js files in root and common monorepo patterns
       const configFiles = [
         'drizzle.config.ts',
         'drizzle.config.js',
         'drizzle.config.mjs'
       ]
       
-             const { existing: configFilesFound } = await this.checkFiles(projectPath, configFiles)
-       evidence.push(...configFilesFound.map(f => `Found config file: ${f.relative}`))
+      // Also check in common monorepo locations
+      const monorepoConfigFiles = [
+        ...configFiles, // root level
+        ...configFiles.map(f => `apps/server/${f}`),
+        ...configFiles.map(f => `apps/api/${f}`),
+        ...configFiles.map(f => `packages/server/${f}`),
+        ...configFiles.map(f => `packages/api/${f}`),
+        ...configFiles.map(f => `backend/${f}`),
+        ...configFiles.map(f => `server/${f}`)
+      ]
+      
+      console.log(`🔍 Searching for config files:`, monorepoConfigFiles)
+      
+      const { existing: configFilesFound } = await this.checkFiles(projectPath, monorepoConfigFiles)
+      console.log(`✅ Config files found:`, configFilesFound.map(f => f.relative))
+      evidence.push(...configFilesFound.map(f => `Found config file: ${f.relative}`))
        
-       // Check for package.json with drizzle dependencies
-       const deps = await this.checkPackageJsonDependencies(projectPath, ['drizzle-orm', 'drizzle-kit'])
-       evidence.push(...deps.found.map(dep => `Found dependency: ${dep}`))
+       // Check for package.json with drizzle dependencies - check root and config directories
+       console.log(`🔍 Checking root dependencies in: ${projectPath}`)
+       let deps = await this.checkPackageJsonDependencies(projectPath, ['drizzle-orm', 'drizzle-kit'])
+       console.log(`📦 Root dependencies found:`, deps.found)
+       evidence.push(...deps.found.map(dep => `Found dependency: ${dep} (root)`))
+       
+       // Also check for dependencies in the same directory as any found config files
+       for (const configFile of configFilesFound) {
+         const configDir = path.dirname(configFile.absolute)
+         console.log(`🔍 Checking dependencies in config dir: ${configDir}`)
+         const configDeps = await this.checkPackageJsonDependencies(configDir, ['drizzle-orm', 'drizzle-kit'])
+         console.log(`📦 Config dir dependencies found:`, configDeps.found)
+         evidence.push(...configDeps.found.map(dep => `Found dependency: ${dep} (${configFile.relative})`))
+         // Merge the found dependencies
+         deps.found = [...new Set([...deps.found, ...configDeps.found])]
+       }
+       
+       console.log(`📦 Total dependencies found:`, deps.found)
        
        // Check for common schema file patterns
        const schemaPatterns = [
@@ -48,17 +79,25 @@ export class DrizzleDetector extends BaseORMDetector {
        evidence.push(...migrationDirsFound.map(f => `Found migration directory: ${f.relative}`))
       
       // Calculate confidence using helper
-      const confidence = this.calculateConfidence({
+      const confidenceInput = {
         required: { 
           found: deps.found.length > 0 ? 1 : 0, 
           total: 1 
         },
         optional: { 
-          found: configFilesFound.length + schemaFiles.length + migrationDirsFound.length, 
-          total: configFiles.length + schemaPatterns.length + migrationDirs.length 
+          found: (configFilesFound.length > 0 ? 1 : 0) + (schemaFiles.length > 0 ? 1 : 0) + (migrationDirsFound.length > 0 ? 1 : 0), 
+          total: 3  // config files, schema files, migration dirs
         },
         negative: 0
-      })
+      }
+      
+      console.log(`🎯 Confidence calculation input:`, confidenceInput)
+      
+      const confidence = this.calculateConfidence(confidenceInput)
+      
+      console.log(`🎯 Final confidence: ${confidence} (${Math.round(confidence * 100)}%)`)
+      console.log(`🎯 Detection threshold: 30%`)
+      console.log(`🎯 Will detect: ${confidence > 0.3}`)
       
       return {
         found: confidence > 0.3,
@@ -76,14 +115,25 @@ export class DrizzleDetector extends BaseORMDetector {
   
   async extractConfig(projectPath: string): Promise<DrizzleConfig | null> {
     try {
-      // Try to find drizzle config file
+      // Try to find drizzle config file in root and common monorepo patterns
       const configFiles = [
         'drizzle.config.ts',
         'drizzle.config.js',
         'drizzle.config.mjs'
       ]
       
-      const { existing: configFilesFound } = await this.checkFiles(projectPath, configFiles)
+      // Also check in common monorepo locations
+      const monorepoConfigFiles = [
+        ...configFiles, // root level
+        ...configFiles.map(f => `apps/server/${f}`),
+        ...configFiles.map(f => `apps/api/${f}`),
+        ...configFiles.map(f => `packages/server/${f}`),
+        ...configFiles.map(f => `packages/api/${f}`),
+        ...configFiles.map(f => `backend/${f}`),
+        ...configFiles.map(f => `server/${f}`)
+      ]
+      
+      const { existing: configFilesFound } = await this.checkFiles(projectPath, monorepoConfigFiles)
       if (configFilesFound.length === 0) {
         return null
       }

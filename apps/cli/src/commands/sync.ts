@@ -21,7 +21,7 @@ export interface SyncOptions {
 }
 
 export async function syncCommand(options: SyncOptions, globalOptions: GlobalOptions): Promise<void> {
-  const spinner = createSpinner('Detecting ORM setup and analyzing schema changes...')
+  const spinner = createSpinner('🌊 Detecting ORM setup and analyzing schema changes...')
   
   const projectPath = options.project ? path.resolve(options.project) : process.cwd()
   const cfg = await getFlowConfig(globalOptions, projectPath)
@@ -47,8 +47,9 @@ export async function syncCommand(options: SyncOptions, globalOptions: GlobalOpt
   }
 
   if (!detectedORM) {
-    spinner.fail('ORM detection failed')
-    console.log(pc.red('No supported ORM detected. Make sure you have Prisma, Drizzle, or TypeORM configured.'))
+    spinner.fail('❌ ORM detection failed')
+    console.log(pc.red('\n❌ No supported ORM detected. Make sure you have Prisma, Drizzle, or TypeORM configured.'))
+    console.log(pc.gray('   Supported ORMs: Prisma, Drizzle, TypeORM'))
     return
   }
 
@@ -65,9 +66,9 @@ export async function syncCommand(options: SyncOptions, globalOptions: GlobalOpt
   const hasChanges = await checkForSchemaChanges(detectedORM, ormConfig, projectPath)
   
   if (!hasChanges && !options.force) {
-    spinner.succeed('Schema analysis completed')
-    console.log(pc.green('🎉 No pending schema changes detected. Your migrations are up to date.'))
-    console.log(pc.gray('Use --force to re-analyze existing migrations for enhancements.'))
+    spinner.succeed('✅ Schema analysis completed')
+    console.log(pc.green('\n✅ No pending schema changes detected. Your migrations are up to date.'))
+    console.log(pc.gray('   Use --force to re-analyze existing migrations for enhancements.'))
     return
   }
 
@@ -82,7 +83,8 @@ export async function syncCommand(options: SyncOptions, globalOptions: GlobalOpt
     await enhanceExistingMigrations(absoluteMigrationsDir, globalOptions, options)
   }
 
-  spinner.succeed('Sync completed')
+  console.log(pc.green('\n✅ Sync completed successfully!'))
+  spinner.succeed('✅ Sync completed')
 }
 
 async function checkForSchemaChanges(orm: string, config: any, projectPath: string): Promise<boolean> {
@@ -186,15 +188,20 @@ async function handleSchemaChanges(
 ): Promise<void> {
   const migrationName = `flow_change_${Date.now()}`
   let generateCmd = ''
+  let workingDir = projectPath
 
   switch (orm) {
     case 'prisma':
       generateCmd = `npx prisma migrate dev --name ${migrationName}`
       break
     case 'drizzle':
-      // The --dialect flag conflicts with the --config flag which drizzle-kit uses implicitly.
-      // Drizzle Kit will detect the dialect from the config file.
-      generateCmd = `npx drizzle-kit generate`
+      // For Drizzle, we need to run from the directory containing the config file
+      if (config?.configFile?.absolute) {
+        workingDir = path.dirname(config.configFile.absolute)
+        generateCmd = `npx drizzle-kit generate`
+      } else {
+        generateCmd = `npx drizzle-kit generate`
+      }
       break
     case 'typeorm':
       const migPath = path.join(migrationsDir, migrationName)
@@ -204,17 +211,17 @@ async function handleSchemaChanges(
 
   const spinner = createSpinner(`Running ${orm} to generate migration...`)
   try {
-    const { stdout, stderr } = await execa(generateCmd, { cwd: projectPath, shell: true })
+    const { stdout, stderr } = await execa(generateCmd, { cwd: workingDir, shell: true })
     if (globalOptions.debug) {
       console.log(stdout)
       if (stderr) console.error(pc.yellow(stderr))
     }
-    spinner.succeed('ORM migration generated successfully.')
+    spinner.succeed('✅ ORM migration generated successfully.')
     await enhanceExistingMigrations(migrationsDir, globalOptions, options)
   } catch (error: any) {
-    spinner.fail('Migration generation failed.')
-    console.error(pc.red(error.stderr || error.message))
-    console.log(pc.yellow(`Could not automatically generate migration. Please run the following command manually:\n${generateCmd}`))
+    spinner.fail('❌ Migration generation failed.')
+    console.error(pc.red(`\n❌ ${error.stderr || error.message}`))
+    console.log(pc.yellow(`\n⚠️  Please run the following command manually:\n   ${generateCmd}`))
   }
 }
 
@@ -233,7 +240,7 @@ async function enhanceExistingMigrations(
   const migrationFiles = files.filter(file => file.endsWith('.sql') || file.endsWith('.ts') || file.endsWith('.js'));
 
   if (migrationFiles.length === 0) {
-    spinner.succeed('No migration files found to analyze.')
+    spinner.succeed('✅ No migration files found to analyze.')
     return
   }
   
@@ -322,9 +329,11 @@ async function enhanceExistingMigrations(
   }
 
   if (changesApplied === 0 && analyses.every(a => !a.hasChanges)) {
-    console.log(pc.gray('No enhancements needed for any migration files.'))
+    console.log(pc.gray('\n◇  No enhancements needed for any migration files.'))
+  } else {
+    console.log(pc.green(`\n✅ Applied ${changesApplied} enhancement(s) to migration files.`))
   }
-  spinner.succeed('Enhancement analysis completed.')
+  spinner.succeed('✅ Enhancement analysis completed.')
 }
 
 function extractSQLFromMigrationFile(content: string): string {
