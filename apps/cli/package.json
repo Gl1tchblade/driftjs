@@ -1,6 +1,6 @@
 {
   "name": "@driftjs/flow",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "The complete all-in-one CLI for safe schema evolution. Flow wraps your ORM (Prisma, Drizzle, TypeORM) to automate zero-downtime migrations and prevent production risks. Ultra-fast analysis with enterprise-grade safety features.",
   "main": "dist/index.js",
   "type": "module",
