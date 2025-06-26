@@ -9,9 +9,6 @@ COPY package.json bun.lock turbo.json ./
 # Copy the server application directory
 COPY apps/server apps/server
 
-# Copy the web application's public directory for static file serving
-COPY apps/web/public apps/web/public
-
 # Install dependencies for the whole monorepo
 RUN bun install
 
@@ -31,9 +28,6 @@ WORKDIR /app/apps/server
 
 # Copy monorepo root dependencies (used by all packages)
 COPY --from=base /app/node_modules /app/node_modules
-
-# Copy the web app's public directory for static file serving
-COPY --from=base /app/apps/web/public ../web/public
 
 # Runtime artefacts for the server package
 COPY --from=base /app/apps/server/dist ./dist
