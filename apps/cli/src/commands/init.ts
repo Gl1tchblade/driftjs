@@ -7,9 +7,9 @@ import { GlobalOptions } from '../lib/config.js'
 import fsExtra from 'fs-extra'
 import { resolve } from 'node:path'
 import dotenv from 'dotenv'
-import { PrismaDetector, DrizzleDetector, TypeORMDetector } from '@driftjs/analyzer'
+import { PrismaDetector, DrizzleDetector, TypeORMDetector } from '../analyzer/index.js'
 // @ts-ignore – optional type import not strictly needed for compilation
-// import type { FlowConfig } from '@driftjs/core'
+// import type { FlowConfig } from '../../core/index.js'
 
 export interface InitOptions {
   force?: boolean

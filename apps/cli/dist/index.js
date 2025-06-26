@@ -24312,7 +24312,7 @@ import { Command } from "commander";
 import { intro, outro, isCancel, cancel, log as log2 } from "@clack/prompts";
 
 // package.json
-var version = "0.2.0";
+var version = "1.0.0";
 
 // src/lib/prompts.ts
 import { confirm, select, multiselect, text, spinner, log } from "@clack/prompts";
@@ -24345,10 +24345,10 @@ import fsExtra from "fs-extra";
 import { resolve as resolve2 } from "path";
 import dotenv from "dotenv";
 
-// ../../packages/analyzer/src/orm-detectors/base-detector.ts
+// src/analyzer/orm-detectors/base-detector.ts
 import { join as join2 } from "path";
 
-// ../../packages/core/src/utils/file-utils.ts
+// src/core/utils/file-utils.ts
 import fs from "fs-extra";
 import { join, resolve, relative } from "path";
 var { readFile, writeFile, access, stat, readdir } = fs;
@@ -24414,11 +24414,11 @@ async function readJsonFile(path7) {
   }
 }
 
-// ../../packages/core/src/utils/config.ts
+// src/core/utils/config.ts
 import fs2 from "fs-extra";
 import path from "path";
 
-// ../../packages/analyzer/src/orm-detectors/base-detector.ts
+// src/analyzer/orm-detectors/base-detector.ts
 var BaseORMDetector = class {
   /**
    * Common helper: Check if package.json contains specific dependencies
@@ -24519,7 +24519,7 @@ var BaseORMDetector = class {
   }
 };
 
-// ../../packages/analyzer/src/orm-detectors/prisma-detector.ts
+// src/analyzer/orm-detectors/prisma-detector.ts
 var PrismaDetector = class extends BaseORMDetector {
   name = "prisma";
   /**
@@ -24672,7 +24672,7 @@ var PrismaDetector = class extends BaseORMDetector {
   }
 };
 
-// ../../packages/analyzer/src/orm-detectors/drizzle-detector.ts
+// src/analyzer/orm-detectors/drizzle-detector.ts
 import path2 from "path";
 import fs3 from "fs-extra";
 var DrizzleDetector = class extends BaseORMDetector {
@@ -24805,7 +24805,7 @@ var DrizzleDetector = class extends BaseORMDetector {
   }
 };
 
-// ../../packages/analyzer/src/orm-detectors/typeorm-detector.ts
+// src/analyzer/orm-detectors/typeorm-detector.ts
 import fs4 from "fs/promises";
 var TypeORMDetector = class extends BaseORMDetector {
   name = "typeorm";
@@ -25166,11 +25166,11 @@ async function findConfigFile(startDir, explicit) {
   throw new Error("flow.config.json not found");
 }
 
-// ../../packages/enhancer/src/parsers/sql-parser.ts
+// src/enhancer/parsers/sql-parser.ts
 import pkg from "node-sql-parser";
 var { Parser } = pkg;
 
-// ../../packages/enhancer/src/risk-detector.ts
+// src/enhancer/risk-detector.ts
 var SQLRiskDetector = class {
   constructor(dbConnection) {
     this.dbConnection = dbConnection;
@@ -25654,7 +25654,7 @@ var SQLRiskDetector = class {
   }
 };
 
-// ../../packages/enhancer/src/strategy-generator.ts
+// src/enhancer/strategy-generator.ts
 var EnhancementStrategyGenerator = class {
   constructor(dbConnection) {
     this.dbConnection = dbConnection;
@@ -26334,7 +26334,7 @@ var EnhancementStrategyGenerator = class {
   }
 };
 
-// ../../packages/enhancer/src/enhancement-engine.ts
+// src/enhancer/enhancement-engine.ts
 var EnhancementEngine = class {
   risk = new SQLRiskDetector();
   generator = new EnhancementStrategyGenerator({});
