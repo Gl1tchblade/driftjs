@@ -8,8 +8,6 @@ services:
       dockerfile: apps/server/Dockerfile
     env_file:
       - .env
-    ports:
-      - "3000:3000"
     environment:
       NODE_ENV: production
     restart: always
@@ -22,8 +20,6 @@ services:
       dockerfile: apps/web/Dockerfile
       args:
         - VITE_SERVER_URL=${VITE_SERVER_URL}
-    ports:
-      - "3001:3001"
     environment:
       # Frontend configuration
       VITE_SERVER_URL: ${VITE_SERVER_URL}
