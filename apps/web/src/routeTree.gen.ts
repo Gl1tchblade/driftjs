@@ -18,9 +18,14 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as DocsFlowRouteImport } from './routes/docs.flow'
 import { Route as DocsFlowValidateRouteImport } from './routes/docs.flow.validate'
 import { Route as DocsFlowStatusRouteImport } from './routes/docs.flow.status'
+import { Route as DocsFlowRollbackRouteImport } from './routes/docs.flow.rollback'
 import { Route as DocsFlowQuickStartRouteImport } from './routes/docs.flow.quick-start'
+import { Route as DocsFlowPlanRouteImport } from './routes/docs.flow.plan'
 import { Route as DocsFlowInstallationRouteImport } from './routes/docs.flow.installation'
+import { Route as DocsFlowInitRouteImport } from './routes/docs.flow.init'
 import { Route as DocsFlowEnhancementsRouteImport } from './routes/docs.flow.enhancements'
+import { Route as DocsFlowEnhanceRouteImport } from './routes/docs.flow.enhance'
+import { Route as DocsFlowConfigRouteImport } from './routes/docs.flow.config'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -67,9 +72,19 @@ const DocsFlowStatusRoute = DocsFlowStatusRouteImport.update({
   path: '/status',
   getParentRoute: () => DocsFlowRoute,
 } as any)
+const DocsFlowRollbackRoute = DocsFlowRollbackRouteImport.update({
+  id: '/rollback',
+  path: '/rollback',
+  getParentRoute: () => DocsFlowRoute,
+} as any)
 const DocsFlowQuickStartRoute = DocsFlowQuickStartRouteImport.update({
   id: '/quick-start',
   path: '/quick-start',
+  getParentRoute: () => DocsFlowRoute,
+} as any)
+const DocsFlowPlanRoute = DocsFlowPlanRouteImport.update({
+  id: '/plan',
+  path: '/plan',
   getParentRoute: () => DocsFlowRoute,
 } as any)
 const DocsFlowInstallationRoute = DocsFlowInstallationRouteImport.update({
@@ -77,9 +92,24 @@ const DocsFlowInstallationRoute = DocsFlowInstallationRouteImport.update({
   path: '/installation',
   getParentRoute: () => DocsFlowRoute,
 } as any)
+const DocsFlowInitRoute = DocsFlowInitRouteImport.update({
+  id: '/init',
+  path: '/init',
+  getParentRoute: () => DocsFlowRoute,
+} as any)
 const DocsFlowEnhancementsRoute = DocsFlowEnhancementsRouteImport.update({
   id: '/enhancements',
   path: '/enhancements',
+  getParentRoute: () => DocsFlowRoute,
+} as any)
+const DocsFlowEnhanceRoute = DocsFlowEnhanceRouteImport.update({
+  id: '/enhance',
+  path: '/enhance',
+  getParentRoute: () => DocsFlowRoute,
+} as any)
+const DocsFlowConfigRoute = DocsFlowConfigRouteImport.update({
+  id: '/config',
+  path: '/config',
   getParentRoute: () => DocsFlowRoute,
 } as any)
 
@@ -91,9 +121,14 @@ export interface FileRoutesByFullPath {
   '/landing': typeof LandingRoute
   '/login': typeof LoginRoute
   '/docs/flow': typeof DocsFlowRouteWithChildren
+  '/docs/flow/config': typeof DocsFlowConfigRoute
+  '/docs/flow/enhance': typeof DocsFlowEnhanceRoute
   '/docs/flow/enhancements': typeof DocsFlowEnhancementsRoute
+  '/docs/flow/init': typeof DocsFlowInitRoute
   '/docs/flow/installation': typeof DocsFlowInstallationRoute
+  '/docs/flow/plan': typeof DocsFlowPlanRoute
   '/docs/flow/quick-start': typeof DocsFlowQuickStartRoute
+  '/docs/flow/rollback': typeof DocsFlowRollbackRoute
   '/docs/flow/status': typeof DocsFlowStatusRoute
   '/docs/flow/validate': typeof DocsFlowValidateRoute
 }
@@ -105,9 +140,14 @@ export interface FileRoutesByTo {
   '/landing': typeof LandingRoute
   '/login': typeof LoginRoute
   '/docs/flow': typeof DocsFlowRouteWithChildren
+  '/docs/flow/config': typeof DocsFlowConfigRoute
+  '/docs/flow/enhance': typeof DocsFlowEnhanceRoute
   '/docs/flow/enhancements': typeof DocsFlowEnhancementsRoute
+  '/docs/flow/init': typeof DocsFlowInitRoute
   '/docs/flow/installation': typeof DocsFlowInstallationRoute
+  '/docs/flow/plan': typeof DocsFlowPlanRoute
   '/docs/flow/quick-start': typeof DocsFlowQuickStartRoute
+  '/docs/flow/rollback': typeof DocsFlowRollbackRoute
   '/docs/flow/status': typeof DocsFlowStatusRoute
   '/docs/flow/validate': typeof DocsFlowValidateRoute
 }
@@ -120,9 +160,14 @@ export interface FileRoutesById {
   '/landing': typeof LandingRoute
   '/login': typeof LoginRoute
   '/docs/flow': typeof DocsFlowRouteWithChildren
+  '/docs/flow/config': typeof DocsFlowConfigRoute
+  '/docs/flow/enhance': typeof DocsFlowEnhanceRoute
   '/docs/flow/enhancements': typeof DocsFlowEnhancementsRoute
+  '/docs/flow/init': typeof DocsFlowInitRoute
   '/docs/flow/installation': typeof DocsFlowInstallationRoute
+  '/docs/flow/plan': typeof DocsFlowPlanRoute
   '/docs/flow/quick-start': typeof DocsFlowQuickStartRoute
+  '/docs/flow/rollback': typeof DocsFlowRollbackRoute
   '/docs/flow/status': typeof DocsFlowStatusRoute
   '/docs/flow/validate': typeof DocsFlowValidateRoute
 }
@@ -136,9 +181,14 @@ export interface FileRouteTypes {
     | '/landing'
     | '/login'
     | '/docs/flow'
+    | '/docs/flow/config'
+    | '/docs/flow/enhance'
     | '/docs/flow/enhancements'
+    | '/docs/flow/init'
     | '/docs/flow/installation'
+    | '/docs/flow/plan'
     | '/docs/flow/quick-start'
+    | '/docs/flow/rollback'
     | '/docs/flow/status'
     | '/docs/flow/validate'
   fileRoutesByTo: FileRoutesByTo
@@ -150,9 +200,14 @@ export interface FileRouteTypes {
     | '/landing'
     | '/login'
     | '/docs/flow'
+    | '/docs/flow/config'
+    | '/docs/flow/enhance'
     | '/docs/flow/enhancements'
+    | '/docs/flow/init'
     | '/docs/flow/installation'
+    | '/docs/flow/plan'
     | '/docs/flow/quick-start'
+    | '/docs/flow/rollback'
     | '/docs/flow/status'
     | '/docs/flow/validate'
   id:
@@ -164,9 +219,14 @@ export interface FileRouteTypes {
     | '/landing'
     | '/login'
     | '/docs/flow'
+    | '/docs/flow/config'
+    | '/docs/flow/enhance'
     | '/docs/flow/enhancements'
+    | '/docs/flow/init'
     | '/docs/flow/installation'
+    | '/docs/flow/plan'
     | '/docs/flow/quick-start'
+    | '/docs/flow/rollback'
     | '/docs/flow/status'
     | '/docs/flow/validate'
   fileRoutesById: FileRoutesById
@@ -245,11 +305,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DocsFlowStatusRouteImport
       parentRoute: typeof DocsFlowRoute
     }
+    '/docs/flow/rollback': {
+      id: '/docs/flow/rollback'
+      path: '/rollback'
+      fullPath: '/docs/flow/rollback'
+      preLoaderRoute: typeof DocsFlowRollbackRouteImport
+      parentRoute: typeof DocsFlowRoute
+    }
     '/docs/flow/quick-start': {
       id: '/docs/flow/quick-start'
       path: '/quick-start'
       fullPath: '/docs/flow/quick-start'
       preLoaderRoute: typeof DocsFlowQuickStartRouteImport
+      parentRoute: typeof DocsFlowRoute
+    }
+    '/docs/flow/plan': {
+      id: '/docs/flow/plan'
+      path: '/plan'
+      fullPath: '/docs/flow/plan'
+      preLoaderRoute: typeof DocsFlowPlanRouteImport
       parentRoute: typeof DocsFlowRoute
     }
     '/docs/flow/installation': {
@@ -259,6 +333,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DocsFlowInstallationRouteImport
       parentRoute: typeof DocsFlowRoute
     }
+    '/docs/flow/init': {
+      id: '/docs/flow/init'
+      path: '/init'
+      fullPath: '/docs/flow/init'
+      preLoaderRoute: typeof DocsFlowInitRouteImport
+      parentRoute: typeof DocsFlowRoute
+    }
     '/docs/flow/enhancements': {
       id: '/docs/flow/enhancements'
       path: '/enhancements'
@@ -266,21 +347,45 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DocsFlowEnhancementsRouteImport
       parentRoute: typeof DocsFlowRoute
     }
+    '/docs/flow/enhance': {
+      id: '/docs/flow/enhance'
+      path: '/enhance'
+      fullPath: '/docs/flow/enhance'
+      preLoaderRoute: typeof DocsFlowEnhanceRouteImport
+      parentRoute: typeof DocsFlowRoute
+    }
+    '/docs/flow/config': {
+      id: '/docs/flow/config'
+      path: '/config'
+      fullPath: '/docs/flow/config'
+      preLoaderRoute: typeof DocsFlowConfigRouteImport
+      parentRoute: typeof DocsFlowRoute
+    }
   }
 }
 
 interface DocsFlowRouteChildren {
+  DocsFlowConfigRoute: typeof DocsFlowConfigRoute
+  DocsFlowEnhanceRoute: typeof DocsFlowEnhanceRoute
   DocsFlowEnhancementsRoute: typeof DocsFlowEnhancementsRoute
+  DocsFlowInitRoute: typeof DocsFlowInitRoute
   DocsFlowInstallationRoute: typeof DocsFlowInstallationRoute
+  DocsFlowPlanRoute: typeof DocsFlowPlanRoute
   DocsFlowQuickStartRoute: typeof DocsFlowQuickStartRoute
+  DocsFlowRollbackRoute: typeof DocsFlowRollbackRoute
   DocsFlowStatusRoute: typeof DocsFlowStatusRoute
   DocsFlowValidateRoute: typeof DocsFlowValidateRoute
 }
 
 const DocsFlowRouteChildren: DocsFlowRouteChildren = {
+  DocsFlowConfigRoute: DocsFlowConfigRoute,
+  DocsFlowEnhanceRoute: DocsFlowEnhanceRoute,
   DocsFlowEnhancementsRoute: DocsFlowEnhancementsRoute,
+  DocsFlowInitRoute: DocsFlowInitRoute,
   DocsFlowInstallationRoute: DocsFlowInstallationRoute,
+  DocsFlowPlanRoute: DocsFlowPlanRoute,
   DocsFlowQuickStartRoute: DocsFlowQuickStartRoute,
+  DocsFlowRollbackRoute: DocsFlowRollbackRoute,
   DocsFlowStatusRoute: DocsFlowStatusRoute,
   DocsFlowValidateRoute: DocsFlowValidateRoute,
 }
