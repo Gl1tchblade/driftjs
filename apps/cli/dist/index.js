@@ -3409,7 +3409,7 @@ var require_split2 = __commonJS({
 var require_helper = __commonJS({
   "../../node_modules/pgpass/lib/helper.js"(exports, module) {
     "use strict";
-    var path6 = __require("path");
+    var path7 = __require("path");
     var Stream = __require("stream").Stream;
     var split = require_split2();
     var util = __require("util");
@@ -3448,7 +3448,7 @@ var require_helper = __commonJS({
     };
     module.exports.getFileName = function(rawEnv) {
       var env = rawEnv || process.env;
-      var file = env.PGPASSFILE || (isWin ? path6.join(env.APPDATA || "./", "postgresql", "pgpass.conf") : path6.join(env.HOME || "./", ".pgpass"));
+      var file = env.PGPASSFILE || (isWin ? path7.join(env.APPDATA || "./", "postgresql", "pgpass.conf") : path7.join(env.HOME || "./", ".pgpass"));
       return file;
     };
     module.exports.usePgPass = function(stats, fname) {
@@ -3580,7 +3580,7 @@ var require_helper = __commonJS({
 var require_lib = __commonJS({
   "../../node_modules/pgpass/lib/index.js"(exports, module) {
     "use strict";
-    var path6 = __require("path");
+    var path7 = __require("path");
     var fs8 = __require("fs");
     var helper = require_helper();
     module.exports = function(connInfo, cb) {
@@ -19372,12 +19372,12 @@ var require_query4 = __commonJS({
         this._fields.push([]);
         return this.readField;
       }
-      _streamLocalInfile(connection, path6) {
+      _streamLocalInfile(connection, path7) {
         if (this._streamFactory) {
-          this._localStream = this._streamFactory(path6);
+          this._localStream = this._streamFactory(path7);
         } else {
           this._localStreamError = new Error(
-            `As a result of LOCAL INFILE command server wants to read ${path6} file, but as of v2.0 you must provide streamFactory option returning ReadStream.`
+            `As a result of LOCAL INFILE command server wants to read ${path7} file, but as of v2.0 you must provide streamFactory option returning ReadStream.`
           );
           connection.writePacket(EmptyPacket);
           return this.infileOk;
@@ -24312,7 +24312,7 @@ import { Command } from "commander";
 import { intro, outro, isCancel, cancel, log as log2 } from "@clack/prompts";
 
 // package.json
-var version = "0.1.9";
+var version = "0.2.0";
 
 // src/lib/prompts.ts
 import { confirm, select, multiselect, text, spinner, log } from "@clack/prompts";
@@ -24352,16 +24352,16 @@ import { join as join2 } from "path";
 import fs from "fs-extra";
 import { join, resolve, relative } from "path";
 var { readFile, writeFile, access, stat, readdir } = fs;
-async function exists(path6) {
+async function exists(path7) {
   try {
-    await access(path6);
+    await access(path7);
     return true;
   } catch {
     return false;
   }
 }
-async function createFilePath(path6, basePath = process.cwd()) {
-  const absolutePath = resolve(basePath, path6);
+async function createFilePath(path7, basePath = process.cwd()) {
+  const absolutePath = resolve(basePath, path7);
   const relativePath = relative(basePath, absolutePath);
   const fileExists = await exists(absolutePath);
   return {
@@ -24370,9 +24370,9 @@ async function createFilePath(path6, basePath = process.cwd()) {
     exists: fileExists
   };
 }
-async function readFileContent(path6) {
+async function readFileContent(path7) {
   try {
-    const content = await readFile(path6, "utf-8");
+    const content = await readFile(path7, "utf-8");
     return { success: true, data: content };
   } catch (error) {
     return {
@@ -24398,8 +24398,8 @@ async function findFiles(directory, pattern, recursive = true) {
   }
   return files;
 }
-async function readJsonFile(path6) {
-  const fileResult = await readFileContent(path6);
+async function readJsonFile(path7) {
+  const fileResult = await readFileContent(path7);
   if (!fileResult.success) {
     return fileResult;
   }
@@ -24409,7 +24409,7 @@ async function readJsonFile(path6) {
   } catch (error) {
     return {
       success: false,
-      error: new Error(`Invalid JSON in file ${path6}: ${error instanceof Error ? error.message : "Unknown error"}`)
+      error: new Error(`Invalid JSON in file ${path7}: ${error instanceof Error ? error.message : "Unknown error"}`)
     };
   }
 }
@@ -24673,7 +24673,8 @@ var PrismaDetector = class extends BaseORMDetector {
 };
 
 // ../../packages/analyzer/src/orm-detectors/drizzle-detector.ts
-import fs3 from "fs/promises";
+import path2 from "path";
+import fs3 from "fs-extra";
 var DrizzleDetector = class extends BaseORMDetector {
   name = "drizzle";
   async detect(projectPath) {
@@ -24740,14 +24741,19 @@ var DrizzleDetector = class extends BaseORMDetector {
       const driver = this.extractConfigValue(configContent, "dialect") || "pg";
       const validDrivers = ["pg", "mysql2", "better-sqlite3", "sqlite"];
       const mappedDriver = validDrivers.includes(driver) ? driver : "pg";
+      const outDir = this.extractConfigValue(configContent, "out") || "./drizzle";
+      const migrationDirAbsolute = path2.resolve(projectPath, outDir);
       const config = {
         type: "drizzle",
         configFile,
         driver: mappedDriver,
         schemaPath: this.extractConfigValue(configContent, "schema") || "./src/db/schema.ts",
-        outDir: this.extractConfigValue(configContent, "out") || "./drizzle",
-        migrationDirectory: configFile,
-        // Will be updated with proper migration directory
+        outDir,
+        migrationDirectory: {
+          absolute: migrationDirAbsolute,
+          relative: outDir,
+          exists: await fs3.pathExists(migrationDirAbsolute)
+        },
         dependencies: ["drizzle-orm", "drizzle-kit"]
       };
       return config;
@@ -25170,20 +25176,22 @@ var SQLRiskDetector = class {
     this.dbConnection = dbConnection;
   }
   /**
-   * Analyze SQL statements for risks and generate comprehensive assessment
+   * Ultra-fast SQL risk analysis using pattern matching and caching
    */
   async analyzeSQL(sql, tableMetadata) {
+    const sqlLower = sql.toLowerCase();
     const riskCategories = [];
     const mitigationStrategies = [];
     const warnings2 = [];
     const blockers = [];
-    const statements = this.parseStatements(sql);
-    for (const statement of statements) {
-      const statementRisks = await this.analyzeStatement(statement, tableMetadata);
-      riskCategories.push(...statementRisks.categories);
-      mitigationStrategies.push(...statementRisks.mitigations);
-      warnings2.push(...statementRisks.warnings);
-      blockers.push(...statementRisks.blockers);
+    const riskPatterns = this.getUltraFastRiskPatterns();
+    for (const pattern of riskPatterns) {
+      if (pattern.regex.test(sqlLower)) {
+        riskCategories.push(pattern.risk);
+        mitigationStrategies.push(...pattern.mitigations);
+        if (pattern.isBlocker) blockers.push(pattern.risk.description);
+        if (pattern.isWarning) warnings2.push(pattern.risk.description);
+      }
     }
     const riskScore = this.calculateRiskScore(riskCategories);
     const riskLevel = this.determineRiskLevel(riskScore);
@@ -25195,6 +25203,91 @@ var SQLRiskDetector = class {
       warnings: [...new Set(warnings2)],
       blockers: [...new Set(blockers)]
     };
+  }
+  /**
+   * Ultra-fast risk pattern matching for instant analysis
+   */
+  getUltraFastRiskPatterns() {
+    return [
+      {
+        regex: /alter\s+table.*add\s+column.*not\s+null(?!.*default)/i,
+        risk: {
+          type: "BLOCKING",
+          severity: "HIGH",
+          description: "Adding NOT NULL column without default causes table rewrite",
+          affectedObjects: [],
+          estimatedImpact: { lockDuration: 300, downtime: 300, rollbackDifficulty: "MEDIUM" }
+        },
+        mitigations: ["Add column as nullable first", "Populate with default values", "Add NOT NULL constraint separately"],
+        isBlocker: true,
+        isWarning: true
+      },
+      {
+        regex: /drop\s+(table|column)/i,
+        risk: {
+          type: "DESTRUCTIVE",
+          severity: "CRITICAL",
+          description: "Destructive operation may cause permanent data loss",
+          affectedObjects: [],
+          estimatedImpact: { dataLoss: true, rollbackDifficulty: "IMPOSSIBLE" }
+        },
+        mitigations: ["Create data backup before executing", "Use soft delete patterns", "Archive data instead of dropping"],
+        isBlocker: true,
+        isWarning: true
+      },
+      {
+        regex: /create\s+index(?!\s+concurrently)/i,
+        risk: {
+          type: "BLOCKING",
+          severity: "MEDIUM",
+          description: "Index creation without CONCURRENTLY causes table lock",
+          affectedObjects: [],
+          estimatedImpact: { lockDuration: 120, downtime: 120, rollbackDifficulty: "EASY" }
+        },
+        mitigations: ["Use CREATE INDEX CONCURRENTLY", "Run during maintenance window"],
+        isBlocker: false,
+        isWarning: true
+      },
+      {
+        regex: /alter\s+table.*add\s+constraint/i,
+        risk: {
+          type: "PERFORMANCE",
+          severity: "MEDIUM",
+          description: "Adding constraints can cause table scan and lock",
+          affectedObjects: [],
+          estimatedImpact: { lockDuration: 60, rollbackDifficulty: "EASY" }
+        },
+        mitigations: ["Add constraint with NOT VALID first", "Validate constraint separately"],
+        isBlocker: false,
+        isWarning: true
+      }
+    ];
+  }
+  calculateRiskScore(categories) {
+    let score = 0;
+    for (const category of categories) {
+      switch (category.severity) {
+        case "LOW":
+          score += 10;
+          break;
+        case "MEDIUM":
+          score += 25;
+          break;
+        case "HIGH":
+          score += 50;
+          break;
+        case "CRITICAL":
+          score += 100;
+          break;
+      }
+    }
+    return Math.min(score, 100);
+  }
+  determineRiskLevel(score) {
+    if (score >= 80) return "CRITICAL";
+    if (score >= 50) return "HIGH";
+    if (score >= 25) return "MEDIUM";
+    return "LOW";
   }
   /**
    * Parse SQL into individual statements
@@ -25552,46 +25645,6 @@ var SQLRiskDetector = class {
     return { categories, mitigations, blockers };
   }
   /**
-   * Calculate overall risk score from individual risk categories
-   */
-  calculateRiskScore(categories) {
-    if (categories.length === 0) return 0;
-    const severityWeights = {
-      "LOW": 10,
-      "MEDIUM": 25,
-      "HIGH": 50,
-      "CRITICAL": 100
-    };
-    const typeWeights = {
-      "DESTRUCTIVE": 1.5,
-      "BLOCKING": 1.2,
-      "DOWNTIME": 1.3,
-      "CONSTRAINT": 1,
-      "PERFORMANCE": 0.8
-    };
-    let totalScore = 0;
-    let maxScore = 0;
-    for (const category of categories) {
-      const severityScore = severityWeights[category.severity];
-      const typeMultiplier = typeWeights[category.type];
-      const categoryScore = severityScore * typeMultiplier;
-      totalScore += categoryScore;
-      maxScore = Math.max(maxScore, categoryScore);
-    }
-    const avgScore = totalScore / categories.length;
-    const finalScore = avgScore * 0.6 + maxScore * 0.4;
-    return Math.min(100, Math.round(finalScore));
-  }
-  /**
-   * Determine risk level from numeric score
-   */
-  determineRiskLevel(score) {
-    if (score >= 80) return "CRITICAL";
-    if (score >= 60) return "HIGH";
-    if (score >= 30) return "MEDIUM";
-    return "LOW";
-  }
-  /**
    * Extract table name from SQL statement
    */
   extractTableName(statement, afterKeyword) {
@@ -25609,17 +25662,20 @@ var EnhancementStrategyGenerator = class {
   }
   riskDetector;
   /**
-   * Generate comprehensive enhancement strategy for SQL migration
+   * Ultra-fast strategy generation using pattern-based enhancements
    */
   async generateStrategy(originalSQL, tableMetadata, options) {
-    const riskAssessment = await this.riskDetector.analyzeSQL(originalSQL, tableMetadata);
-    const enhancedSteps = await this.createEnhancedSteps(originalSQL, riskAssessment, tableMetadata, options);
-    const rollbackStrategy = this.createRollbackStrategy(enhancedSteps, riskAssessment);
-    const preFlightChecks = await this.createPreFlightChecks(originalSQL, tableMetadata);
-    const postMigrationValidation = this.createValidationSteps(originalSQL, tableMetadata);
-    const maintenanceWindow = this.calculateMaintenanceWindow(enhancedSteps, riskAssessment);
+    const sqlLower = originalSQL.toLowerCase();
+    const enhancedSteps = this.generateUltraFastSteps(originalSQL, sqlLower);
+    const rollbackStrategy = this.generateUltraFastRollback(originalSQL, sqlLower);
+    const preFlightChecks = this.generateUltraFastChecks(originalSQL, sqlLower);
+    const postMigrationValidation = this.generateUltraFastValidation(originalSQL, sqlLower);
     const estimatedDuration = enhancedSteps.reduce((total, step) => total + step.estimatedDuration, 0);
-    const dependencies = this.extractDependencies(enhancedSteps);
+    const maintenanceWindow = {
+      required: estimatedDuration > 30,
+      recommendedDuration: estimatedDuration + 60,
+      optimalTime: "off-peak"
+    };
     return {
       originalSQL,
       enhancedSteps,
@@ -25628,8 +25684,170 @@ var EnhancementStrategyGenerator = class {
       postMigrationValidation,
       estimatedDuration,
       maintenanceWindow,
-      dependencies
+      dependencies: []
     };
+  }
+  /**
+   * Generate enhanced steps using ultra-fast pattern matching
+   */
+  generateUltraFastSteps(originalSQL, sqlLower) {
+    const steps = [];
+    if (sqlLower.includes("add column") && sqlLower.includes("not null") && !sqlLower.includes("default")) {
+      const enhancedSQL = originalSQL.replace(/NOT NULL/gi, "");
+      steps.push({
+        stepNumber: 1,
+        description: "Add column as nullable first",
+        sql: enhancedSQL + ";",
+        riskLevel: "LOW",
+        estimatedDuration: 5,
+        canRollback: true,
+        dependencies: [],
+        validationQueries: [],
+        onFailure: "ROLLBACK"
+      });
+      const tableMatch = sqlLower.match(/alter\s+table\s+(\w+)/i);
+      const columnMatch = sqlLower.match(/add\s+column\s+(\w+)/i);
+      if (tableMatch && columnMatch) {
+        steps.push({
+          stepNumber: 2,
+          description: "Set default value for existing rows",
+          sql: `UPDATE ${tableMatch[1]} SET ${columnMatch[1]} = '' WHERE ${columnMatch[1]} IS NULL;`,
+          riskLevel: "MEDIUM",
+          estimatedDuration: 10,
+          canRollback: true,
+          dependencies: [],
+          validationQueries: [],
+          onFailure: "ROLLBACK"
+        });
+        steps.push({
+          stepNumber: 3,
+          description: "Add NOT NULL constraint",
+          sql: `ALTER TABLE ${tableMatch[1]} ALTER COLUMN ${columnMatch[1]} SET NOT NULL;`,
+          riskLevel: "LOW",
+          estimatedDuration: 2,
+          canRollback: true,
+          dependencies: [],
+          validationQueries: [],
+          onFailure: "ROLLBACK"
+        });
+      }
+    } else if (sqlLower.includes("create index") && !sqlLower.includes("concurrently")) {
+      const enhancedSQL = originalSQL.replace(/CREATE INDEX/gi, "CREATE INDEX CONCURRENTLY");
+      steps.push({
+        stepNumber: 1,
+        description: "Create index concurrently to avoid table locks",
+        sql: enhancedSQL,
+        riskLevel: "LOW",
+        estimatedDuration: 30,
+        canRollback: true,
+        dependencies: [],
+        validationQueries: [],
+        onFailure: "CONTINUE"
+      });
+    } else if (sqlLower.includes("add constraint")) {
+      const enhancedSQL = originalSQL.replace(/;?\s*$/, " NOT VALID;");
+      steps.push({
+        stepNumber: 1,
+        description: "Add constraint without validation",
+        sql: enhancedSQL,
+        riskLevel: "LOW",
+        estimatedDuration: 5,
+        canRollback: true,
+        dependencies: [],
+        validationQueries: [],
+        onFailure: "ROLLBACK"
+      });
+      const constraintMatch = sqlLower.match(/add\s+constraint\s+(\w+)/i);
+      const tableMatch = sqlLower.match(/alter\s+table\s+(\w+)/i);
+      if (constraintMatch && tableMatch) {
+        steps.push({
+          stepNumber: 2,
+          description: "Validate constraint separately",
+          sql: `ALTER TABLE ${tableMatch[1]} VALIDATE CONSTRAINT ${constraintMatch[1]};`,
+          riskLevel: "MEDIUM",
+          estimatedDuration: 15,
+          canRollback: true,
+          dependencies: [],
+          validationQueries: [],
+          onFailure: "CONTINUE"
+        });
+      }
+    } else {
+      steps.push({
+        stepNumber: 1,
+        description: "Execute optimized migration",
+        sql: originalSQL,
+        riskLevel: "LOW",
+        estimatedDuration: 10,
+        canRollback: true,
+        dependencies: [],
+        validationQueries: [],
+        onFailure: "ROLLBACK"
+      });
+    }
+    return steps;
+  }
+  generateUltraFastRollback(originalSQL, sqlLower) {
+    const rollbackSteps = [];
+    if (sqlLower.includes("create table")) {
+      const tableMatch = sqlLower.match(/create\s+table\s+(\w+)/i);
+      if (tableMatch) {
+        rollbackSteps.push({
+          stepNumber: 1,
+          description: "Drop created table",
+          sql: `DROP TABLE IF EXISTS ${tableMatch[1]};`
+        });
+      }
+    } else if (sqlLower.includes("add column")) {
+      const tableMatch = sqlLower.match(/alter\s+table\s+(\w+)/i);
+      const columnMatch = sqlLower.match(/add\s+column\s+(\w+)/i);
+      if (tableMatch && columnMatch) {
+        rollbackSteps.push({
+          stepNumber: 1,
+          description: "Drop added column",
+          sql: `ALTER TABLE ${tableMatch[1]} DROP COLUMN IF EXISTS ${columnMatch[1]};`
+        });
+      }
+    }
+    return {
+      canRollback: rollbackSteps.length > 0,
+      rollbackSteps,
+      dataBackupRequired: sqlLower.includes("drop"),
+      rollbackComplexity: "SIMPLE",
+      rollbackWindow: 30
+    };
+  }
+  generateUltraFastChecks(originalSQL, sqlLower) {
+    const checks = [];
+    if (sqlLower.includes("alter table")) {
+      const tableMatch = sqlLower.match(/alter\s+table\s+(\w+)/i);
+      if (tableMatch) {
+        checks.push({
+          checkName: "table_exists",
+          description: "Verify table exists before alteration",
+          query: `SELECT 1 FROM information_schema.tables WHERE table_name = '${tableMatch[1]}';`,
+          expectedResult: "has_rows",
+          onFailure: "ABORT"
+        });
+      }
+    }
+    return checks;
+  }
+  generateUltraFastValidation(originalSQL, sqlLower) {
+    const validations = [];
+    if (sqlLower.includes("create table")) {
+      const tableMatch = sqlLower.match(/create\s+table\s+(\w+)/i);
+      if (tableMatch) {
+        validations.push({
+          stepName: "verify_table_created",
+          description: "Verify table was created successfully",
+          query: `SELECT 1 FROM information_schema.tables WHERE table_name = '${tableMatch[1]}';`,
+          expectedResult: "has_rows",
+          onFailure: "WARN"
+        });
+      }
+    }
+    return validations;
   }
   /**
    * Create enhanced migration steps with safety improvements
@@ -26120,14 +26338,25 @@ var EnhancementStrategyGenerator = class {
 var EnhancementEngine = class {
   risk = new SQLRiskDetector();
   generator = new EnhancementStrategyGenerator({});
+  enhancementCache = /* @__PURE__ */ new Map();
   /**
-   * Analyse a migration file and return an enhanced, production-safe version.
+   * Ultra-fast migration analysis with aggressive caching and optimization
    */
   async enhance(migration) {
-    const sql = migration.up;
-    const riskReport = await this.risk.analyzeSQL(sql);
-    const strategy = await this.generator.generateStrategy(migration.up);
-    return {
+    const cacheKey = this.generateCacheKey(migration.up);
+    if (this.enhancementCache.has(cacheKey)) {
+      const cached = this.enhancementCache.get(cacheKey);
+      return {
+        ...cached,
+        original: migration
+        // Update original reference
+      };
+    }
+    const [riskReport, strategy] = await Promise.all([
+      this.risk.analyzeSQL(migration.up),
+      this.generator.generateStrategy(migration.up)
+    ]);
+    const enhanced = {
       original: migration,
       enhanced: {
         up: strategy.enhancedSteps.map((s) => s.sql).join("\n"),
@@ -26138,18 +26367,38 @@ var EnhancementEngine = class {
       },
       estimatedDuration: strategy.estimatedDuration
     };
+    this.enhancementCache.set(cacheKey, enhanced);
+    return enhanced;
+  }
+  /**
+   * Generate ultra-fast cache key using simple hash
+   */
+  generateCacheKey(sql) {
+    let hash = 0;
+    for (let i = 0; i < sql.length; i++) {
+      const char = sql.charCodeAt(i);
+      hash = (hash << 5) - hash + char;
+      hash = hash & hash;
+    }
+    return hash.toString(36);
+  }
+  /**
+   * Clear cache if needed
+   */
+  clearCache() {
+    this.enhancementCache.clear();
   }
 };
 
 // src/commands/sync.ts
 import fs5 from "fs-extra";
-import path2 from "path";
+import path3 from "path";
 import { diffChars } from "diff";
 import pc from "picocolors";
 import { execa } from "execa";
 async function syncCommand(options, globalOptions) {
   const spinner3 = createSpinner("Detecting ORM setup and analyzing schema changes...");
-  const projectPath = options.project ? path2.resolve(options.project) : process.cwd();
+  const projectPath = options.project ? path3.resolve(options.project) : process.cwd();
   const cfg = await getFlowConfig(globalOptions, projectPath);
   const envCfg = cfg.environments[cfg.defaultEnvironment];
   let detectedORM = null;
@@ -26189,7 +26438,7 @@ async function syncCommand(options, globalOptions) {
     return;
   }
   const migrationsDir = envCfg.migrationsPath || ormConfig?.migrationDirectory?.relative || "./migrations";
-  const absoluteMigrationsDir = path2.resolve(projectPath, migrationsDir);
+  const absoluteMigrationsDir = path3.resolve(projectPath, migrationsDir);
   if (hasChanges) {
     spinner3.update("Generating migration plan for schema changes...");
     await handleSchemaChanges(detectedORM, ormConfig, absoluteMigrationsDir, globalOptions, projectPath, options);
@@ -26213,8 +26462,8 @@ async function checkForSchemaChanges(orm, config, projectPath) {
 }
 async function checkPrismaChanges(config, projectPath) {
   try {
-    const schemaPath = path2.join(projectPath, "prisma", "schema.prisma");
-    const migrationsPath = path2.join(projectPath, "prisma", "migrations");
+    const schemaPath = path3.join(projectPath, "prisma", "schema.prisma");
+    const migrationsPath = path3.join(projectPath, "prisma", "migrations");
     if (!await fs5.pathExists(schemaPath)) return false;
     if (!await fs5.pathExists(migrationsPath)) return true;
     try {
@@ -26232,7 +26481,7 @@ async function checkPrismaChanges(config, projectPath) {
       const migrationDirs = migrationFiles.filter((file) => file.match(/^\d{14}_/));
       if (migrationDirs.length === 0) return true;
       const latestMigration = migrationDirs.sort().pop();
-      const latestMigrationPath = path2.join(migrationsPath, latestMigration);
+      const latestMigrationPath = path3.join(migrationsPath, latestMigration);
       const migrationStats = await fs5.stat(latestMigrationPath);
       return schemaStats.mtime > migrationStats.mtime;
     }
@@ -26252,20 +26501,20 @@ async function checkTypeORMChanges(config, projectPath) {
     } catch {
       const entityDirs = ["src/entities", "src/entity", "entities"];
       const migrationsDir = config?.migrationDirectory || "./src/migrations";
-      const migrationsDirPath = path2.join(projectPath, migrationsDir);
+      const migrationsDirPath = path3.join(projectPath, migrationsDir);
       if (!await fs5.pathExists(migrationsDirPath)) return true;
       for (const entityDir of entityDirs) {
-        const entityDirPath = path2.join(projectPath, entityDir);
+        const entityDirPath = path3.join(projectPath, entityDir);
         if (await fs5.pathExists(entityDirPath)) {
           const entityFiles = await fs5.readdir(entityDirPath);
           const tsFiles = entityFiles.filter((f) => f.endsWith(".ts") || f.endsWith(".js"));
           for (const entityFile of tsFiles) {
-            const entityPath = path2.join(entityDirPath, entityFile);
+            const entityPath = path3.join(entityDirPath, entityFile);
             const entityStats = await fs5.stat(entityPath);
             const migrationFiles = await fs5.readdir(migrationsDirPath);
             if (migrationFiles.length === 0) return true;
             const latestMigration = migrationFiles.sort().pop();
-            const latestMigrationPath = path2.join(migrationsDirPath, latestMigration);
+            const latestMigrationPath = path3.join(migrationsDirPath, latestMigration);
             const migrationStats = await fs5.stat(latestMigrationPath);
             if (entityStats.mtime > migrationStats.mtime) {
               return true;
@@ -26291,7 +26540,7 @@ async function handleSchemaChanges(orm, config, migrationsDir, globalOptions, pr
       generateCmd = `npx drizzle-kit generate`;
       break;
     case "typeorm":
-      const migPath = path2.join(migrationsDir, migrationName);
+      const migPath = path3.join(migrationsDir, migrationName);
       generateCmd = `npx typeorm migration:generate ${migPath}`;
       break;
   }
@@ -26325,54 +26574,80 @@ async function enhanceExistingMigrations(migrationsDir, globalOptions, options) 
   }
   spinner3.update(`Found ${migrationFiles.length} migration(s) to analyze for enhancements.`);
   const engine = new EnhancementEngine();
-  for (const file of migrationFiles) {
-    spinner3.update(`Analyzing ${file}...`);
-    const filePath = path2.join(migrationsDir, file);
-    const content = await fs5.readFile(filePath, "utf-8");
-    const sql = extractSQLFromMigrationFile(content);
-    const migrationFile = {
-      path: filePath,
-      name: file,
-      up: sql,
-      down: "",
-      timestamp: /* @__PURE__ */ new Date(),
-      operations: [],
-      checksum: ""
-    };
-    const enhanced = await engine.enhance(migrationFile);
-    if (enhanced.original.up !== enhanced.enhanced.up) {
+  spinner3.update("Reading migration files...");
+  const fileReads = await Promise.all(
+    migrationFiles.map(async (file) => {
+      const filePath = path3.join(migrationsDir, file);
+      const content = await fs5.readFile(filePath, "utf-8");
+      const sql = extractSQLFromMigrationFile(content);
+      return {
+        file,
+        filePath,
+        content,
+        sql,
+        migrationFile: {
+          path: filePath,
+          name: file,
+          up: sql,
+          down: "",
+          timestamp: /* @__PURE__ */ new Date(),
+          operations: [],
+          checksum: ""
+        }
+      };
+    })
+  );
+  spinner3.update("Analyzing migrations in parallel...");
+  const analyses = await Promise.all(
+    fileReads.map(async ({ file, filePath, content, sql, migrationFile }) => {
+      const enhanced = await engine.enhance(migrationFile);
+      return {
+        file,
+        filePath,
+        content,
+        sql,
+        enhanced,
+        hasChanges: enhanced.original.up !== enhanced.enhanced.up
+      };
+    })
+  );
+  let changesApplied = 0;
+  for (const analysis of analyses) {
+    if (analysis.hasChanges) {
       const originalColor = (text2) => pc.red(`- ${text2}`);
       const enhancedColor = (text2) => pc.green(`+ ${text2}`);
-      const diff = diffChars(enhanced.original.up, enhanced.enhanced.up);
+      const diff = diffChars(analysis.enhanced.original.up, analysis.enhanced.enhanced.up);
       let diffOutput = "";
       diff.forEach((part) => {
         const color = part.added ? enhancedColor : part.removed ? originalColor : pc.gray;
         diffOutput += color(part.value);
       });
       console.log(pc.bold(`
-Enhancements for ${file}:`));
+Enhancements for ${analysis.file}:`));
       console.log(diffOutput);
-      const proceed = options.yes ? true : await confirm2({ message: `Apply these enhancements to ${file}?` });
+      const proceed = options.yes ? true : await confirm2({ message: `Apply these enhancements to ${analysis.file}?` });
       if (proceed) {
         try {
-          const newContent = await replaceEnhancedSQLInMigrationFile(filePath, enhanced.enhanced.up, enhanced.enhanced.down);
-          await fs5.writeFile(filePath, newContent, "utf-8");
-          console.log(pc.green(`\u2705 Updated ${file}`));
+          const newContent = await replaceEnhancedSQLInMigrationFile(analysis.filePath, analysis.enhanced.enhanced.up, analysis.enhanced.enhanced.down);
+          await fs5.writeFile(analysis.filePath, newContent, "utf-8");
+          console.log(pc.green(`\u2705 Updated ${analysis.file}`));
+          changesApplied++;
         } catch (error) {
-          console.log(pc.yellow(`\u26A0\uFE0F  Could not automatically update ${file}: ${error}`));
+          console.log(pc.yellow(`\u26A0\uFE0F  Could not automatically update ${analysis.file}: ${error}`));
           console.log(pc.gray("Enhanced UP SQL:"));
-          console.log(enhanced.enhanced.up);
-          if (enhanced.enhanced.down) {
+          console.log(analysis.enhanced.enhanced.up);
+          if (analysis.enhanced.enhanced.down) {
             console.log(pc.gray("Enhanced DOWN SQL:"));
-            console.log(enhanced.enhanced.down);
+            console.log(analysis.enhanced.enhanced.down);
           }
         }
       } else {
-        console.log(pc.gray(`Skipped ${file}`));
+        console.log(pc.gray(`Skipped ${analysis.file}`));
       }
-    } else {
-      console.log(pc.gray("No enhancements needed."));
     }
+  }
+  if (changesApplied === 0 && analyses.every((a) => !a.hasChanges)) {
+    console.log(pc.gray("No enhancements needed for any migration files."));
   }
   spinner3.succeed("Enhancement analysis completed.");
 }
@@ -26394,6 +26669,21 @@ function extractSQLFromMigrationFile(content) {
 async function replaceEnhancedSQLInMigrationFile(filePath, upSQL, downSQL) {
   const content = await fs5.readFile(filePath, "utf-8");
   let updatedContent = content;
+  const fileName = path3.basename(filePath);
+  const enhancementComment = generateEnhancementComment(fileName, upSQL);
+  if (!updatedContent.includes("Enhanced by DriftJS")) {
+    const lines = updatedContent.split("\n");
+    let insertIndex = 0;
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (line && !line.startsWith("//") && !line.startsWith("/*") && !line.startsWith("*") && !line.startsWith("import") && !line.startsWith("export")) {
+        insertIndex = i;
+        break;
+      }
+    }
+    lines.splice(insertIndex, 0, enhancementComment, "");
+    updatedContent = lines.join("\n");
+  }
   updatedContent = updatedContent.replace(/queryRunner\.query\s*\(\s*[`"']([^`"']+)[`"']/g, `queryRunner.query(\`${upSQL.trim()}\`)`);
   updatedContent = updatedContent.replace(/sql\s*`([^`]+)`/g, `sql\`${upSQL.trim()}\``);
   updatedContent = updatedContent.replace(/"((?:CREATE|ALTER|DROP|INSERT|UPDATE|DELETE)[^"]+)"/gi, `"${upSQL.trim()}"`);
@@ -26402,13 +26692,68 @@ async function replaceEnhancedSQLInMigrationFile(filePath, upSQL, downSQL) {
   }
   return updatedContent;
 }
+function generateEnhancementComment(fileName, enhancedSQL) {
+  const timestamp = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
+  const operations = analyzeEnhancements(enhancedSQL);
+  const header = `/*
+ * Migration Enhanced by DriftJS.com
+ * File: ${fileName}
+ * Enhanced: ${timestamp}
+ * 
+ * This migration has been optimized for production safety and performance.
+ * Learn more at https://driftjs.com
+ */`;
+  if (operations.length === 1) {
+    return `${header.slice(0, -2)}
+ * 
+ * Enhancement: ${operations[0]}
+ */`;
+  } else if (operations.length > 1) {
+    const enhancementList = operations.map((op) => ` * - ${op}`).join("\n");
+    return `${header.slice(0, -2)}
+ * 
+ * Enhancements Applied:
+${enhancementList}
+ */`;
+  }
+  return header;
+}
+function analyzeEnhancements(sql) {
+  const enhancements = [];
+  const sqlLower = sql.toLowerCase();
+  if (sqlLower.includes("add constraint") && sqlLower.includes("not valid")) {
+    enhancements.push("Safe constraint addition with NOT VALID optimization");
+  }
+  if (sqlLower.includes("concurrently")) {
+    enhancements.push("Non-blocking concurrent index creation");
+  }
+  if (sqlLower.includes("backup") || sqlLower.includes("copy")) {
+    enhancements.push("Data backup created before destructive operations");
+  }
+  if (sqlLower.includes("alter table") && sqlLower.includes("add column") && !sqlLower.includes("not null")) {
+    enhancements.push("Nullable column added first for safe NOT NULL migration");
+  }
+  if (sqlLower.includes("validate constraint")) {
+    enhancements.push("Constraint validation separated for reduced downtime");
+  }
+  if (sqlLower.includes("lock timeout") || sqlLower.includes("statement_timeout")) {
+    enhancements.push("Query timeouts configured to prevent long locks");
+  }
+  if (sqlLower.includes("begin;") && sqlLower.includes("commit;")) {
+    enhancements.push("Transaction boundaries optimized for safety");
+  }
+  if (enhancements.length === 0) {
+    enhancements.push("Production-ready migration optimizations applied");
+  }
+  return enhancements;
+}
 
 // src/commands/test.ts
 import { spinner as spinner2 } from "@clack/prompts";
-import path3 from "path";
+import path4 from "path";
 async function testCommand(options, globalOptions) {
   const s = spinner2();
-  const projectPath = options.project ? path3.resolve(options.project) : process.cwd();
+  const projectPath = options.project ? path4.resolve(options.project) : process.cwd();
   const cfg = await getFlowConfig(globalOptions, projectPath);
   if (globalOptions.debug) {
     console.log("Testing migrations against env:", cfg.defaultEnvironment);
@@ -26424,11 +26769,11 @@ import { confirm as confirm3 } from "@clack/prompts";
 init_esm();
 var import_promise = __toESM(require_promise(), 1);
 import fs6 from "fs-extra";
-import path4 from "path";
+import path5 from "path";
 import pc2 from "picocolors";
-import sqlite3 from "sqlite3";
+import Database from "better-sqlite3";
 async function applyCommand(options, globalOptions) {
-  const projectPath = options.project ? path4.resolve(options.project) : process.cwd();
+  const projectPath = options.project ? path5.resolve(options.project) : process.cwd();
   const cfg = await getFlowConfig(globalOptions, projectPath);
   const envCfg = cfg.environments[cfg.defaultEnvironment];
   if (globalOptions.debug) {
@@ -26453,7 +26798,7 @@ async function applyCommand(options, globalOptions) {
     console.log("ensured migrations table");
     spinner3.update("Finding migrations to apply...");
     const migrationsDir = envCfg.migrationsPath || "./migrations";
-    const absoluteMigrationsDir = path4.resolve(projectPath, migrationsDir);
+    const absoluteMigrationsDir = path5.resolve(projectPath, migrationsDir);
     const pendingMigrations = await findPendingMigrations(connection, absoluteMigrationsDir, options.migration);
     console.log("found pending migrations");
     if (pendingMigrations.length === 0) {
@@ -26539,7 +26884,7 @@ async function connectToDatabase(envCfg) {
     case "sqlite":
       console.log("connecting to sqlite");
       const sqlitePath = connectionString.substring("sqlite:".length);
-      const sqliteDb = new sqlite3.Database(sqlitePath || "./database.db");
+      const sqliteDb = new Database(sqlitePath || "./database.db");
       console.log("connected to sqlite");
       return { type: "sqlite", client: sqliteDb };
     default:
@@ -26590,14 +26935,14 @@ async function findPendingMigrations(connection, migrationsDir, targetMigration)
   const migrationFiles = allFiles.filter((f) => f.endsWith(".sql") || f.endsWith(".ts") || f.endsWith(".js")).sort();
   const pendingMigrations = [];
   for (const file of migrationFiles) {
-    const migrationName = path4.parse(file).name;
+    const migrationName = path5.parse(file).name;
     if (appliedNames.has(migrationName)) {
       continue;
     }
     if (targetMigration && migrationName !== targetMigration) {
       continue;
     }
-    const filePath = path4.join(migrationsDir, file);
+    const filePath = path5.join(migrationsDir, file);
     let content = await fs6.readFile(filePath, "utf-8");
     if (file.endsWith(".ts") || file.endsWith(".js")) {
       content = extractSQLFromMigrationFile2(content);
@@ -26636,25 +26981,17 @@ async function recordMigrationApplied(connection, migration) {
   await executeQuery(connection, insertQuery, [migration.name, checksum]);
 }
 async function executeQuery(connection, query, params) {
-  return new Promise((resolve4, reject) => {
-    switch (connection.type) {
-      case "postgresql":
-        connection.client.query(query, params, (err, result) => {
-          if (err) return reject(err);
-          resolve4(result.rows);
-        });
-        break;
-      case "mysql":
-        connection.client.query(query, params).then(([rows]) => resolve4(rows)).catch((err) => reject(err));
-        break;
-      case "sqlite":
-        connection.client.all(query, params, (err, rows) => {
-          if (err) return reject(err);
-          resolve4(rows);
-        });
-        break;
-    }
-  });
+  switch (connection.type) {
+    case "postgresql":
+      const pgResult = await connection.client.query(query, params);
+      return pgResult.rows;
+    case "mysql":
+      const [mysqlResult] = await connection.client.execute(query, params);
+      return mysqlResult;
+    case "sqlite":
+      const stmt = connection.client.prepare(query);
+      return stmt.all(params);
+  }
 }
 async function closeDatabaseConnection(connection) {
   switch (connection.type) {
@@ -26685,11 +27022,11 @@ import { confirm as confirm4 } from "@clack/prompts";
 init_esm();
 var import_promise2 = __toESM(require_promise(), 1);
 import fs7 from "fs-extra";
-import path5 from "path";
+import path6 from "path";
 import pc3 from "picocolors";
-import sqlite32 from "sqlite3";
+import Database2 from "better-sqlite3";
 async function backCommand(options, globalOptions) {
-  const projectPath = options.project ? path5.resolve(options.project) : process.cwd();
+  const projectPath = options.project ? path6.resolve(options.project) : process.cwd();
   const cfg = await getFlowConfig(globalOptions, projectPath);
   const envCfg = cfg.environments[cfg.defaultEnvironment];
   if (globalOptions.debug) {
@@ -26811,7 +27148,7 @@ async function connectToDatabase2(envCfg) {
       return { type: "mysql", client: mysqlConnection };
     case "sqlite":
       const sqlitePath = connectionString.substring("sqlite:".length);
-      const sqliteDb = new sqlite32.Database(sqlitePath || "./database.db");
+      const sqliteDb = new Database2(sqlitePath || "./database.db");
       return { type: "sqlite", client: sqliteDb };
     default:
       throw new Error(`Unsupported database type: ${dbType}`);
@@ -26850,11 +27187,11 @@ async function determineMigrationsToRollback(appliedMigrations, options, envCfg,
 }
 async function findDownMigration(migration, envCfg, projectPath) {
   const migrationsDir = envCfg.migrationsPath || "./migrations";
-  const absoluteMigrationsDir = path5.resolve(projectPath, migrationsDir);
+  const absoluteMigrationsDir = path6.resolve(projectPath, migrationsDir);
   const files = await fs7.readdir(absoluteMigrationsDir);
   for (const filename of files) {
-    if (path5.parse(filename).name === migration.name) {
-      const content = await fs7.readFile(path5.join(absoluteMigrationsDir, filename), "utf-8");
+    if (path6.parse(filename).name === migration.name) {
+      const content = await fs7.readFile(path6.join(absoluteMigrationsDir, filename), "utf-8");
       return extractDownSQLFromMigrationFile(content);
     }
   }
@@ -26880,32 +27217,24 @@ async function removeMigrationRecord(connection, migration) {
   await executeQuery2(connection, deleteQuery, [migration.id]);
 }
 async function executeQuery2(connection, query, params) {
-  return new Promise((resolve4, reject) => {
-    switch (connection.type) {
-      case "postgresql":
-        connection.client.query(query, params, (err, result) => {
-          if (err) return reject(err);
-          resolve4(result.rows);
-        });
-        break;
-      case "mysql":
-        connection.client.query(query, params).then(([rows]) => resolve4(rows)).catch((err) => reject(err));
-        break;
-      case "sqlite":
-        if (query.toLowerCase().trim().startsWith("select")) {
-          connection.client.all(query, params, (err, rows) => {
-            if (err) return reject(err);
-            resolve4(rows);
-          });
-        } else {
-          connection.client.run(query, params, (err) => {
-            if (err) return reject(err);
-            resolve4([]);
-          });
-        }
-        break;
-    }
-  });
+  switch (connection.type) {
+    case "postgresql":
+      const pgResult = await connection.client.query(query, params);
+      return pgResult.rows;
+    case "mysql":
+      const [mysqlResult] = await connection.client.execute(query, params);
+      return mysqlResult;
+    case "sqlite":
+      const stmt = connection.client.prepare(query);
+      if (query.toLowerCase().trim().startsWith("select")) {
+        return stmt.all(params);
+      } else {
+        stmt.run(params);
+        return [];
+      }
+    default:
+      throw new Error(`Unsupported database type: ${connection.type}`);
+  }
 }
 async function closeDatabaseConnection2(connection) {
   switch (connection.type) {

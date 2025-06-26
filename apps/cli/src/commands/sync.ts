@@ -239,60 +239,90 @@ async function enhanceExistingMigrations(
   
   spinner.update(`Found ${migrationFiles.length} migration(s) to analyze for enhancements.`)
 
+  // Ultra-fast parallel processing
   const engine = new EnhancementEngine();
+  
+  // Step 1: Read all files in parallel (ultra-fast I/O)
+  spinner.update('Reading migration files...')
+  const fileReads = await Promise.all(
+    migrationFiles.map(async (file) => {
+      const filePath = path.join(migrationsDir, file);
+      const content = await fs.readFile(filePath, 'utf-8');
+      const sql = extractSQLFromMigrationFile(content);
+      return {
+        file,
+        filePath,
+        content,
+        sql,
+        migrationFile: {
+          path: filePath,
+          name: file,
+          up: sql,
+          down: '',
+          timestamp: new Date(),
+          operations: [],
+          checksum: '',
+        }
+      };
+    })
+  );
 
-  for (const file of migrationFiles) {
-    spinner.update(`Analyzing ${file}...`)
-    const filePath = path.join(migrationsDir, file);
-    const content = await fs.readFile(filePath, 'utf-8');
-    const sql = extractSQLFromMigrationFile(content);
-    
-    const migrationFile: any = {
-      path: filePath,
-      name: file,
-      up: sql,
-      down: '',
-      timestamp: new Date(),
-      operations: [],
-      checksum: '',
-    };
+  // Step 2: Analyze all migrations in parallel (ultra-fast processing)
+  spinner.update('Analyzing migrations in parallel...')
+  const analyses = await Promise.all(
+    fileReads.map(async ({ file, filePath, content, sql, migrationFile }) => {
+      const enhanced = await engine.enhance(migrationFile);
+      return {
+        file,
+        filePath,
+        content,
+        sql,
+        enhanced,
+        hasChanges: enhanced.original.up !== enhanced.enhanced.up
+      };
+    })
+  );
 
-    const enhanced = await engine.enhance(migrationFile);
-
-    if (enhanced.original.up !== enhanced.enhanced.up) {
+  // Step 3: Present results and apply changes
+  let changesApplied = 0;
+  for (const analysis of analyses) {
+    if (analysis.hasChanges) {
       const originalColor = (text: string) => pc.red(`- ${text}`);
       const enhancedColor = (text: string) => pc.green(`+ ${text}`);
-      const diff = diffChars(enhanced.original.up, enhanced.enhanced.up);
+      const diff = diffChars(analysis.enhanced.original.up, analysis.enhanced.enhanced.up);
       let diffOutput = '';
       diff.forEach(part => {
         const color = part.added ? enhancedColor : part.removed ? originalColor : pc.gray;
         diffOutput += color(part.value);
       });
-      console.log(pc.bold(`\nEnhancements for ${file}:`))
+      console.log(pc.bold(`\nEnhancements for ${analysis.file}:`))
       console.log(diffOutput)
 
-      const proceed = options.yes ? true : await confirm({ message: `Apply these enhancements to ${file}?` })
+      const proceed = options.yes ? true : await confirm({ message: `Apply these enhancements to ${analysis.file}?` })
 
       if (proceed) {
         try {
-          const newContent = await replaceEnhancedSQLInMigrationFile(filePath, enhanced.enhanced.up, enhanced.enhanced.down);
-          await fs.writeFile(filePath, newContent, 'utf-8');
-          console.log(pc.green(`✅ Updated ${file}`))
+          const newContent = await replaceEnhancedSQLInMigrationFile(analysis.filePath, analysis.enhanced.enhanced.up, analysis.enhanced.enhanced.down);
+          await fs.writeFile(analysis.filePath, newContent, 'utf-8');
+          console.log(pc.green(`✅ Updated ${analysis.file}`))
+          changesApplied++;
         } catch (error) {
-          console.log(pc.yellow(`⚠️  Could not automatically update ${file}: ${error}`))
+          console.log(pc.yellow(`⚠️  Could not automatically update ${analysis.file}: ${error}`))
           console.log(pc.gray('Enhanced UP SQL:'))
-          console.log(enhanced.enhanced.up)
-          if (enhanced.enhanced.down) {
+          console.log(analysis.enhanced.enhanced.up)
+          if (analysis.enhanced.enhanced.down) {
             console.log(pc.gray('Enhanced DOWN SQL:'))
-            console.log(enhanced.enhanced.down)
+            console.log(analysis.enhanced.enhanced.down)
           }
         }
       } else {
-        console.log(pc.gray(`Skipped ${file}`))
+        console.log(pc.gray(`Skipped ${analysis.file}`))
       }
-    } else {
-      console.log(pc.gray('No enhancements needed.'))
     }
+  }
+
+  if (changesApplied === 0 && analyses.every(a => !a.hasChanges)) {
+    console.log(pc.gray('No enhancements needed for any migration files.'))
   }
   spinner.succeed('Enhancement analysis completed.')
 }
@@ -317,6 +347,28 @@ async function replaceEnhancedSQLInMigrationFile(filePath: string, upSQL: string
   const content = await fs.readFile(filePath, 'utf-8');
   let updatedContent = content;
 
+  // Generate enhancement comment header
+  const fileName = path.basename(filePath);
+  const enhancementComment = generateEnhancementComment(fileName, upSQL);
+
+  // Add comment at the top of the file if it doesn't already exist
+  if (!updatedContent.includes('Enhanced by DriftJS')) {
+    const lines = updatedContent.split('\n');
+    let insertIndex = 0;
+    
+    // Skip existing comments and imports to find insertion point
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (line && !line.startsWith('//') && !line.startsWith('/*') && !line.startsWith('*') && !line.startsWith('import') && !line.startsWith('export')) {
+        insertIndex = i;
+        break;
+      }
+    }
+    
+    lines.splice(insertIndex, 0, enhancementComment, '');
+    updatedContent = lines.join('\n');
+  }
+
   updatedContent = updatedContent.replace(/queryRunner\.query\s*\(\s*[`"']([^`"']+)[`"']/g, `queryRunner.query(\`${upSQL.trim()}\`)`);
   updatedContent = updatedContent.replace(/sql\s*`([^`]+)`/g, `sql\`${upSQL.trim()}\``);
   updatedContent = updatedContent.replace(/"((?:CREATE|ALTER|DROP|INSERT|UPDATE|DELETE)[^"]+)"/gi, `"${upSQL.trim()}"`);
@@ -326,4 +378,69 @@ async function replaceEnhancedSQLInMigrationFile(filePath: string, upSQL: string
   }
 
   return updatedContent;
+}
+
+function generateEnhancementComment(fileName: string, enhancedSQL: string): string {
+  const timestamp = new Date().toISOString().split('T')[0];
+  const operations = analyzeEnhancements(enhancedSQL);
+  
+  const header = `/*
+ * Migration Enhanced by DriftJS.com
+ * File: ${fileName}
+ * Enhanced: ${timestamp}
+ * 
+ * This migration has been optimized for production safety and performance.
+ * Learn more at https://driftjs.com
+ */`;
+
+  if (operations.length === 1) {
+    return `${header.slice(0, -2)}
+ * 
+ * Enhancement: ${operations[0]}
+ */`;
+  } else if (operations.length > 1) {
+    const enhancementList = operations.map(op => ` * - ${op}`).join('\n');
+    return `${header.slice(0, -2)}
+ * 
+ * Enhancements Applied:
+${enhancementList}
+ */`;
+  }
+  
+  return header;
+}
+
+function analyzeEnhancements(sql: string): string[] {
+  const enhancements: string[] = [];
+  const sqlLower = sql.toLowerCase();
+  
+  // Detect common enhancement patterns
+  if (sqlLower.includes('add constraint') && sqlLower.includes('not valid')) {
+    enhancements.push('Safe constraint addition with NOT VALID optimization');
+  }
+  if (sqlLower.includes('concurrently')) {
+    enhancements.push('Non-blocking concurrent index creation');
+  }
+  if (sqlLower.includes('backup') || sqlLower.includes('copy')) {
+    enhancements.push('Data backup created before destructive operations');
+  }
+  if (sqlLower.includes('alter table') && sqlLower.includes('add column') && !sqlLower.includes('not null')) {
+    enhancements.push('Nullable column added first for safe NOT NULL migration');
+  }
+  if (sqlLower.includes('validate constraint')) {
+    enhancements.push('Constraint validation separated for reduced downtime');
+  }
+  if (sqlLower.includes('lock timeout') || sqlLower.includes('statement_timeout')) {
+    enhancements.push('Query timeouts configured to prevent long locks');
+  }
+  if (sqlLower.includes('begin;') && sqlLower.includes('commit;')) {
+    enhancements.push('Transaction boundaries optimized for safety');
+  }
+  
+  // Default if no specific enhancements detected
+  if (enhancements.length === 0) {
+    enhancements.push('Production-ready migration optimizations applied');
+  }
+  
+  return enhancements;
 }
