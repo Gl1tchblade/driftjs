@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { DocsLayout } from '../components/docs/docs-layout'
+import DocsLayout from '../components/docs/docs-layout'
 
 export const Route = createFileRoute('/docs/flow/enhancements')({
   component: RouteComponent,
