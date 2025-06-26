@@ -1,0 +1,34 @@
+version: '3.8'
+
+services:
+  # Backend Server (Elysia, tRPC)
+  server:
+    build:
+      context: .
+      dockerfile: apps/server/Dockerfile
+    env_file:
+      - .env
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+    restart: always
+    working_dir: /app/apps/server
+
+  # Frontend Web (React, TanStack Router)
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        - VITE_SERVER_URL=${VITE_SERVER_URL}
+    ports:
+      - "3001:3001"
+    environment:
+      # Frontend configuration
+      VITE_SERVER_URL: ${VITE_SERVER_URL}
+    depends_on:
+      server:
+        condition: service_started # Web depends on server being up
+    restart: always
+    working_dir: /app/apps/web 
