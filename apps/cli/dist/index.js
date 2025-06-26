@@ -5,7 +5,7 @@ import { Command } from "commander";
 import { intro, outro, isCancel, cancel, log as log2 } from "@clack/prompts";
 
 // package.json
-var version = "1.1.0";
+var version = "1.1.1";
 
 // src/lib/prompts.ts
 import { confirm, select, multiselect, text, spinner, log } from "@clack/prompts";
@@ -3198,10 +3198,13 @@ import { diffChars } from "diff";
 import pc from "picocolors";
 import { execa } from "execa";
 async function syncCommand(options, globalOptions) {
-  const spinner3 = createSpinner("\u{1F30A} Detecting ORM setup and analyzing schema changes...");
+  console.log();
+  console.log(pc.cyan("\u{1F30A} DriftJS Flow - Sync"));
+  console.log();
   const projectPath = options.project ? path4.resolve(options.project) : process.cwd();
   const cfg = await getFlowConfig(globalOptions, projectPath);
   const envCfg = cfg.environments[cfg.defaultEnvironment];
+  const spinner3 = createSpinner("Detecting ORM setup...");
   let detectedORM = null;
   const detectors = [
     { name: "prisma", detector: new PrismaDetector() },
@@ -3210,6 +3213,7 @@ async function syncCommand(options, globalOptions) {
   ];
   if (options.orm && options.orm !== "auto") {
     detectedORM = options.orm;
+    spinner3.succeed(`Using specified ORM: ${pc.green(detectedORM)}`);
   } else {
     for (const { name, detector: detector2 } of detectors) {
       const result = await detector2.detect(projectPath);
@@ -3218,38 +3222,45 @@ async function syncCommand(options, globalOptions) {
         break;
       }
     }
+    if (detectedORM) {
+      spinner3.succeed(`Detected ORM: ${pc.green(detectedORM.toUpperCase())}`);
+    } else {
+      spinner3.fail("No ORM detected");
+      console.log();
+      console.log(pc.red("\u2717 No supported ORM found"));
+      console.log(pc.gray("  Supported ORMs: Prisma, Drizzle, TypeORM"));
+      console.log(pc.gray("  Make sure you have a valid ORM configuration in your project"));
+      return;
+    }
   }
-  if (!detectedORM) {
-    spinner3.fail("\u274C ORM detection failed");
-    console.log(pc.red("\n\u274C No supported ORM detected. Make sure you have Prisma, Drizzle, or TypeORM configured."));
-    console.log(pc.gray("   Supported ORMs: Prisma, Drizzle, TypeORM"));
-    return;
-  }
-  spinner3.update(`Detected ${detectedORM.toUpperCase()} - analyzing schema changes...`);
   const detector = detectors.find((d) => d.name === detectedORM)?.detector;
   if (!detector) {
-    spinner3.fail("Detector not found");
+    console.log(pc.red("\u2717 Detector initialization failed"));
     return;
   }
   const ormConfig = await detector.extractConfig(projectPath);
+  const analysisSpinner = createSpinner("Analyzing schema changes...");
   const hasChanges = await checkForSchemaChanges(detectedORM, ormConfig, projectPath);
   if (!hasChanges && !options.force) {
-    spinner3.succeed("\u2705 Schema analysis completed");
-    console.log(pc.green("\n\u2705 No pending schema changes detected. Your migrations are up to date."));
-    console.log(pc.gray("   Use --force to re-analyze existing migrations for enhancements."));
+    analysisSpinner.succeed("Schema analysis complete");
+    console.log();
+    console.log(pc.green("\u2713 No pending schema changes detected"));
+    console.log(pc.gray("  Your migrations are up to date"));
+    console.log(pc.gray("  Use --force to re-analyze existing migrations"));
     return;
   }
+  analysisSpinner.succeed("Schema analysis complete");
   const migrationsDir = envCfg.migrationsPath || ormConfig?.migrationDirectory?.relative || "./migrations";
   const absoluteMigrationsDir = path4.resolve(projectPath, migrationsDir);
   if (hasChanges) {
-    spinner3.update("Generating migration plan for schema changes...");
+    console.log();
+    console.log(pc.yellow("\u26A0 Schema changes detected - generating migration..."));
     await handleSchemaChanges(detectedORM, ormConfig, absoluteMigrationsDir, globalOptions, projectPath, options);
-  } else {
-    spinner3.update("Analyzing existing migrations for enhancements...");
-    await enhanceExistingMigrations(absoluteMigrationsDir, globalOptions, options);
   }
-  console.log(pc.green("\n\u2705 Sync completed successfully!"));
-  spinner3.succeed("\u2705 Sync completed");
+  console.log();
+  await enhanceExistingMigrations(absoluteMigrationsDir, globalOptions, options);
+  console.log();
+  console.log(pc.green("\u2713 Sync completed successfully"));
 }
 async function checkForSchemaChanges(orm, config, projectPath) {
   switch (orm) {
@@ -3289,7 +3300,6 @@ async function checkPrismaChanges(config, projectPath) {
       return schemaStats.mtime > migrationStats.mtime;
     }
   } catch (error) {
-    console.warn("Error checking Prisma changes:", error);
     return false;
   }
 }
@@ -3328,7 +3338,6 @@ async function checkTypeORMChanges(config, projectPath) {
       return false;
     }
   } catch (error) {
-    console.warn("Error checking TypeORM changes:", error);
     return false;
   }
 }
@@ -3353,39 +3362,45 @@ async function handleSchemaChanges(orm, config, migrationsDir, globalOptions, pr
       generateCmd = `npx typeorm migration:generate ${migPath}`;
       break;
   }
-  const spinner3 = createSpinner(`Running ${orm} to generate migration...`);
+  const spinner3 = createSpinner("Generating migration...");
   try {
     const { stdout, stderr } = await execa(generateCmd, { cwd: workingDir, shell: true });
     if (globalOptions.debug) {
       console.log(stdout);
       if (stderr) console.error(pc.yellow(stderr));
     }
-    spinner3.succeed("\u2705 ORM migration generated successfully.");
-    await enhanceExistingMigrations(migrationsDir, globalOptions, options);
+    spinner3.succeed("Migration generated successfully");
   } catch (error) {
-    spinner3.fail("\u274C Migration generation failed.");
-    console.error(pc.red(`
-\u274C ${error.stderr || error.message}`));
-    console.log(pc.yellow(`
-\u26A0\uFE0F  Please run the following command manually:
-   ${generateCmd}`));
+    spinner3.fail("Migration generation failed");
+    console.log();
+    console.log(pc.red("\u2717 Failed to generate migration"));
+    console.log(pc.gray(`  Error: ${error.stderr || error.message}`));
+    console.log();
+    console.log(pc.yellow("\u26A0 Please run this command manually:"));
+    console.log(pc.cyan(`  ${generateCmd}`));
+    return;
   }
 }
 async function enhanceExistingMigrations(migrationsDir, globalOptions, options) {
-  const spinner3 = createSpinner("Analyzing migrations for enhancements...");
+  const spinner3 = createSpinner("Analyzing migrations...");
   if (!await fs6.pathExists(migrationsDir)) {
-    spinner3.fail(`Migrations directory not found: ${migrationsDir}`);
+    spinner3.fail("Migrations directory not found");
+    console.log();
+    console.log(pc.red("\u2717 Migrations directory not found"));
+    console.log(pc.gray(`  Looking for: ${migrationsDir}`));
     return;
   }
   const files = await fs6.readdir(migrationsDir);
   const migrationFiles = files.filter((file) => file.endsWith(".sql") || file.endsWith(".ts") || file.endsWith(".js"));
   if (migrationFiles.length === 0) {
-    spinner3.succeed("\u2705 No migration files found to analyze.");
+    spinner3.succeed("Analysis complete");
+    console.log();
+    console.log(pc.gray("\u2022 No migration files found to analyze"));
     return;
   }
-  spinner3.update(`Found ${migrationFiles.length} migration(s) to analyze for enhancements.`);
+  spinner3.succeed(`Found ${migrationFiles.length} migration file(s)`);
   const engine = new EnhancementEngine();
-  spinner3.update("Reading migration files...");
+  const analysisSpinner = createSpinner("Analyzing enhancement opportunities...");
   const fileReads = await Promise.all(
     migrationFiles.map(async (file) => {
       const filePath = path4.join(migrationsDir, file);
@@ -3408,7 +3423,6 @@ async function enhanceExistingMigrations(migrationsDir, globalOptions, options) 
       };
     })
   );
-  spinner3.update("Analyzing migrations in parallel...");
   const analyses = await Promise.all(
     fileReads.map(async ({ file, filePath, content, sql, migrationFile }) => {
       const enhanced = await engine.enhance(migrationFile);
@@ -3422,48 +3436,72 @@ async function enhanceExistingMigrations(migrationsDir, globalOptions, options) 
       };
     })
   );
+  analysisSpinner.succeed("Enhancement analysis complete");
   let changesApplied = 0;
-  for (const analysis of analyses) {
-    if (analysis.hasChanges) {
-      const originalColor = (text2) => pc.red(`- ${text2}`);
-      const enhancedColor = (text2) => pc.green(`+ ${text2}`);
-      const diff = diffChars(analysis.enhanced.original.up, analysis.enhanced.enhanced.up);
-      let diffOutput = "";
+  const enhancementsFound = analyses.filter((a) => a.hasChanges);
+  if (enhancementsFound.length === 0) {
+    console.log();
+    console.log(pc.gray("\u2022 No enhancements needed - migrations are already optimized"));
+    return;
+  }
+  console.log();
+  console.log(pc.blue(`Found ${enhancementsFound.length} migration(s) that can be enhanced:`));
+  for (const analysis of enhancementsFound) {
+    console.log();
+    console.log(pc.bold(`\u{1F4C4} ${analysis.file}`));
+    const diff = diffChars(analysis.enhanced.original.up, analysis.enhanced.enhanced.up);
+    let hasAdditions = false;
+    let hasRemovals = false;
+    diff.forEach((part) => {
+      if (part.added) hasAdditions = true;
+      if (part.removed) hasRemovals = true;
+    });
+    if (hasAdditions || hasRemovals) {
+      console.log();
       diff.forEach((part) => {
-        const color = part.added ? enhancedColor : part.removed ? originalColor : pc.gray;
-        diffOutput += color(part.value);
-      });
-      console.log(pc.bold(`
-Enhancements for ${analysis.file}:`));
-      console.log(diffOutput);
-      const proceed = options.yes ? true : await confirm2({ message: `Apply these enhancements to ${analysis.file}?` });
-      if (proceed) {
-        try {
-          const newContent = await replaceEnhancedSQLInMigrationFile(analysis.filePath, analysis.enhanced.enhanced.up, analysis.enhanced.enhanced.down);
-          await fs6.writeFile(analysis.filePath, newContent, "utf-8");
-          console.log(pc.green(`\u2705 Updated ${analysis.file}`));
-          changesApplied++;
-        } catch (error) {
-          console.log(pc.yellow(`\u26A0\uFE0F  Could not automatically update ${analysis.file}: ${error}`));
-          console.log(pc.gray("Enhanced UP SQL:"));
-          console.log(analysis.enhanced.enhanced.up);
-          if (analysis.enhanced.enhanced.down) {
-            console.log(pc.gray("Enhanced DOWN SQL:"));
-            console.log(analysis.enhanced.enhanced.down);
-          }
+        if (part.added) {
+          const lines = part.value.split("\n").filter((line) => line.trim());
+          lines.forEach((line) => {
+            if (line.trim()) {
+              console.log(pc.green(`+ ${line.trim()}`));
+            }
+          });
+        } else if (part.removed) {
+          const lines = part.value.split("\n").filter((line) => line.trim());
+          lines.forEach((line) => {
+            if (line.trim()) {
+              console.log(pc.red(`- ${line.trim()}`));
+            }
+          });
         }
-      } else {
-        console.log(pc.gray(`Skipped ${analysis.file}`));
+      });
+    }
+    const proceed = options.yes ? true : await confirm2({
+      message: `Apply enhancements to ${analysis.file}?`,
+      initialValue: true
+    });
+    if (proceed) {
+      try {
+        const newContent = await replaceEnhancedSQLInMigrationFile(
+          analysis.filePath,
+          analysis.enhanced.enhanced.up,
+          analysis.enhanced.enhanced.down
+        );
+        await fs6.writeFile(analysis.filePath, newContent, "utf-8");
+        console.log(pc.green(`\u2713 Enhanced ${analysis.file}`));
+        changesApplied++;
+      } catch (error) {
+        console.log(pc.yellow(`\u26A0 Could not automatically enhance ${analysis.file}`));
+        console.log(pc.gray(`  Error: ${error}`));
       }
+    } else {
+      console.log(pc.gray(`\u2022 Skipped ${analysis.file}`));
     }
   }
-  if (changesApplied === 0 && analyses.every((a) => !a.hasChanges)) {
-    console.log(pc.gray("\n\u25C7  No enhancements needed for any migration files."));
-  } else {
-    console.log(pc.green(`
-\u2705 Applied ${changesApplied} enhancement(s) to migration files.`));
+  if (changesApplied > 0) {
+    console.log();
+    console.log(pc.green(`\u2713 Applied ${changesApplied} enhancement(s) to migration files`));
   }
-  spinner3.succeed("\u2705 Enhancement analysis completed.");
 }
 function extractSQLFromMigrationFile(content) {
   const sqlPatterns = [

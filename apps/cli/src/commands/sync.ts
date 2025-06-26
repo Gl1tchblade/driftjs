@@ -21,11 +21,16 @@ export interface SyncOptions {
 }
 
 export async function syncCommand(options: SyncOptions, globalOptions: GlobalOptions): Promise<void> {
-  const spinner = createSpinner('🌊 Detecting ORM setup and analyzing schema changes...')
+  console.log() // Add space before starting
+  console.log(pc.cyan('🌊 DriftJS Flow - Sync'))
+  console.log() // Add space after header
   
   const projectPath = options.project ? path.resolve(options.project) : process.cwd()
   const cfg = await getFlowConfig(globalOptions, projectPath)
   const envCfg = cfg.environments[cfg.defaultEnvironment]
+  
+  // Step 1: ORM Detection
+  const spinner = createSpinner('Detecting ORM setup...')
   
   let detectedORM: string | null = null
   const detectors = [
@@ -36,6 +41,7 @@ export async function syncCommand(options: SyncOptions, globalOptions: GlobalOpt
 
   if (options.orm && options.orm !== 'auto') {
     detectedORM = options.orm
+    spinner.succeed(`Using specified ORM: ${pc.green(detectedORM)}`)
   } else {
     for (const { name, detector } of detectors) {
       const result = await detector.detect(projectPath)
@@ -44,47 +50,57 @@ export async function syncCommand(options: SyncOptions, globalOptions: GlobalOpt
         break
       }
     }
+    
+    if (detectedORM) {
+      spinner.succeed(`Detected ORM: ${pc.green(detectedORM.toUpperCase())}`)
+    } else {
+      spinner.fail('No ORM detected')
+      console.log()
+      console.log(pc.red('✗ No supported ORM found'))
+      console.log(pc.gray('  Supported ORMs: Prisma, Drizzle, TypeORM'))
+      console.log(pc.gray('  Make sure you have a valid ORM configuration in your project'))
+      return
+    }
   }
 
-  if (!detectedORM) {
-    spinner.fail('❌ ORM detection failed')
-    console.log(pc.red('\n❌ No supported ORM detected. Make sure you have Prisma, Drizzle, or TypeORM configured.'))
-    console.log(pc.gray('   Supported ORMs: Prisma, Drizzle, TypeORM'))
-    return
-  }
-
-  spinner.update(`Detected ${detectedORM.toUpperCase()} - analyzing schema changes...`)
-
+  // Step 2: Schema Analysis
   const detector = detectors.find(d => d.name === detectedORM)?.detector
   if (!detector) {
-    spinner.fail('Detector not found')
+    console.log(pc.red('✗ Detector initialization failed'))
     return
   }
 
   const ormConfig = await detector.extractConfig(projectPath)
   
+  const analysisSpinner = createSpinner('Analyzing schema changes...')
   const hasChanges = await checkForSchemaChanges(detectedORM, ormConfig, projectPath)
   
   if (!hasChanges && !options.force) {
-    spinner.succeed('✅ Schema analysis completed')
-    console.log(pc.green('\n✅ No pending schema changes detected. Your migrations are up to date.'))
-    console.log(pc.gray('   Use --force to re-analyze existing migrations for enhancements.'))
+    analysisSpinner.succeed('Schema analysis complete')
+    console.log()
+    console.log(pc.green('✓ No pending schema changes detected'))
+    console.log(pc.gray('  Your migrations are up to date'))
+    console.log(pc.gray('  Use --force to re-analyze existing migrations'))
     return
   }
+
+  analysisSpinner.succeed('Schema analysis complete')
 
   const migrationsDir = envCfg.migrationsPath || (ormConfig?.migrationDirectory?.relative) || './migrations'
   const absoluteMigrationsDir = path.resolve(projectPath, migrationsDir)
 
   if (hasChanges) {
-    spinner.update('Generating migration plan for schema changes...')
+    console.log()
+    console.log(pc.yellow('⚠ Schema changes detected - generating migration...'))
     await handleSchemaChanges(detectedORM, ormConfig, absoluteMigrationsDir, globalOptions, projectPath, options)
-  } else {
-    spinner.update('Analyzing existing migrations for enhancements...')
-    await enhanceExistingMigrations(absoluteMigrationsDir, globalOptions, options)
   }
 
-  console.log(pc.green('\n✅ Sync completed successfully!'))
-  spinner.succeed('✅ Sync completed')
+  // Step 3: Enhancement Analysis
+  console.log()
+  await enhanceExistingMigrations(absoluteMigrationsDir, globalOptions, options)
+  
+  console.log()
+  console.log(pc.green('✓ Sync completed successfully'))
 }
 
 async function checkForSchemaChanges(orm: string, config: any, projectPath: string): Promise<boolean> {
@@ -128,13 +144,12 @@ async function checkPrismaChanges(config: any, projectPath: string): Promise<boo
       return schemaStats.mtime > migrationStats.mtime
     }
   } catch (error) {
-    console.warn('Error checking Prisma changes:', error)
     return false
   }
 }
 
 async function checkDrizzleChanges(config: any, projectPath: string): Promise<boolean> {
-  // FIXME: This is a temporary hack to bypass the unreliable drizzle-kit check
+  // For now, always return true for Drizzle as detection is complex
   return true
 }
 
@@ -173,7 +188,6 @@ async function checkTypeORMChanges(config: any, projectPath: string): Promise<bo
       return false
     }
   } catch (error) {
-    console.warn('Error checking TypeORM changes:', error)
     return false
   }
 }
@@ -195,7 +209,6 @@ async function handleSchemaChanges(
       generateCmd = `npx prisma migrate dev --name ${migrationName}`
       break
     case 'drizzle':
-      // For Drizzle, we need to run from the directory containing the config file
       if (config?.configFile?.absolute) {
         workingDir = path.dirname(config.configFile.absolute)
         generateCmd = `npx drizzle-kit generate`
@@ -209,19 +222,23 @@ async function handleSchemaChanges(
       break
   }
 
-  const spinner = createSpinner(`Running ${orm} to generate migration...`)
+  const spinner = createSpinner('Generating migration...')
   try {
     const { stdout, stderr } = await execa(generateCmd, { cwd: workingDir, shell: true })
     if (globalOptions.debug) {
       console.log(stdout)
       if (stderr) console.error(pc.yellow(stderr))
     }
-    spinner.succeed('✅ ORM migration generated successfully.')
-    await enhanceExistingMigrations(migrationsDir, globalOptions, options)
+    spinner.succeed('Migration generated successfully')
   } catch (error: any) {
-    spinner.fail('❌ Migration generation failed.')
-    console.error(pc.red(`\n❌ ${error.stderr || error.message}`))
-    console.log(pc.yellow(`\n⚠️  Please run the following command manually:\n   ${generateCmd}`))
+    spinner.fail('Migration generation failed')
+    console.log()
+    console.log(pc.red('✗ Failed to generate migration'))
+    console.log(pc.gray(`  Error: ${error.stderr || error.message}`))
+    console.log()
+    console.log(pc.yellow('⚠ Please run this command manually:'))
+    console.log(pc.cyan(`  ${generateCmd}`))
+    return
   }
 }
 
@@ -230,32 +247,37 @@ async function enhanceExistingMigrations(
   globalOptions: GlobalOptions,
   options: SyncOptions,
 ): Promise<void> {
-  const spinner = createSpinner('Analyzing migrations for enhancements...')
+  const spinner = createSpinner('Analyzing migrations...')
+  
   if (!(await fs.pathExists(migrationsDir))) {
-    spinner.fail(`Migrations directory not found: ${migrationsDir}`)
+    spinner.fail('Migrations directory not found')
+    console.log()
+    console.log(pc.red('✗ Migrations directory not found'))
+    console.log(pc.gray(`  Looking for: ${migrationsDir}`))
     return
   }
 
   const files = await fs.readdir(migrationsDir)
-  const migrationFiles = files.filter(file => file.endsWith('.sql') || file.endsWith('.ts') || file.endsWith('.js'));
+  const migrationFiles = files.filter(file => file.endsWith('.sql') || file.endsWith('.ts') || file.endsWith('.js'))
 
   if (migrationFiles.length === 0) {
-    spinner.succeed('✅ No migration files found to analyze.')
+    spinner.succeed('Analysis complete')
+    console.log()
+    console.log(pc.gray('• No migration files found to analyze'))
     return
   }
   
-  spinner.update(`Found ${migrationFiles.length} migration(s) to analyze for enhancements.`)
+  spinner.succeed(`Found ${migrationFiles.length} migration file(s)`)
 
-  // Ultra-fast parallel processing
-  const engine = new EnhancementEngine();
+  // Analyze migrations
+  const engine = new EnhancementEngine()
+  const analysisSpinner = createSpinner('Analyzing enhancement opportunities...')
   
-  // Step 1: Read all files in parallel (ultra-fast I/O)
-  spinner.update('Reading migration files...')
   const fileReads = await Promise.all(
     migrationFiles.map(async (file) => {
-      const filePath = path.join(migrationsDir, file);
-      const content = await fs.readFile(filePath, 'utf-8');
-      const sql = extractSQLFromMigrationFile(content);
+      const filePath = path.join(migrationsDir, file)
+      const content = await fs.readFile(filePath, 'utf-8')
+      const sql = extractSQLFromMigrationFile(content)
       return {
         file,
         filePath,
@@ -270,15 +292,13 @@ async function enhanceExistingMigrations(
           operations: [],
           checksum: '',
         }
-      };
+      }
     })
-  );
+  )
 
-  // Step 2: Analyze all migrations in parallel (ultra-fast processing)
-  spinner.update('Analyzing migrations in parallel...')
   const analyses = await Promise.all(
     fileReads.map(async ({ file, filePath, content, sql, migrationFile }) => {
-      const enhanced = await engine.enhance(migrationFile);
+      const enhanced = await engine.enhance(migrationFile)
       return {
         file,
         filePath,
@@ -286,54 +306,88 @@ async function enhanceExistingMigrations(
         sql,
         enhanced,
         hasChanges: enhanced.original.up !== enhanced.enhanced.up
-      };
-    })
-  );
-
-  // Step 3: Present results and apply changes
-  let changesApplied = 0;
-  for (const analysis of analyses) {
-    if (analysis.hasChanges) {
-      const originalColor = (text: string) => pc.red(`- ${text}`);
-      const enhancedColor = (text: string) => pc.green(`+ ${text}`);
-      const diff = diffChars(analysis.enhanced.original.up, analysis.enhanced.enhanced.up);
-      let diffOutput = '';
-      diff.forEach(part => {
-        const color = part.added ? enhancedColor : part.removed ? originalColor : pc.gray;
-        diffOutput += color(part.value);
-      });
-      console.log(pc.bold(`\nEnhancements for ${analysis.file}:`))
-      console.log(diffOutput)
-
-      const proceed = options.yes ? true : await confirm({ message: `Apply these enhancements to ${analysis.file}?` })
-
-      if (proceed) {
-        try {
-          const newContent = await replaceEnhancedSQLInMigrationFile(analysis.filePath, analysis.enhanced.enhanced.up, analysis.enhanced.enhanced.down);
-          await fs.writeFile(analysis.filePath, newContent, 'utf-8');
-          console.log(pc.green(`✅ Updated ${analysis.file}`))
-          changesApplied++;
-        } catch (error) {
-          console.log(pc.yellow(`⚠️  Could not automatically update ${analysis.file}: ${error}`))
-          console.log(pc.gray('Enhanced UP SQL:'))
-          console.log(analysis.enhanced.enhanced.up)
-          if (analysis.enhanced.enhanced.down) {
-            console.log(pc.gray('Enhanced DOWN SQL:'))
-            console.log(analysis.enhanced.enhanced.down)
-          }
-        }
-      } else {
-        console.log(pc.gray(`Skipped ${analysis.file}`))
       }
+    })
+  )
+
+  analysisSpinner.succeed('Enhancement analysis complete')
+
+  // Display and apply enhancements
+  let changesApplied = 0
+  const enhancementsFound = analyses.filter(a => a.hasChanges)
+  
+  if (enhancementsFound.length === 0) {
+    console.log()
+    console.log(pc.gray('• No enhancements needed - migrations are already optimized'))
+    return
+  }
+
+  console.log()
+  console.log(pc.blue(`Found ${enhancementsFound.length} migration(s) that can be enhanced:`))
+
+  for (const analysis of enhancementsFound) {
+    console.log()
+    console.log(pc.bold(`📄 ${analysis.file}`))
+    
+    // Show clean diff
+    const diff = diffChars(analysis.enhanced.original.up, analysis.enhanced.enhanced.up)
+    let hasAdditions = false
+    let hasRemovals = false
+    
+    diff.forEach(part => {
+      if (part.added) hasAdditions = true
+      if (part.removed) hasRemovals = true
+    })
+    
+    if (hasAdditions || hasRemovals) {
+      console.log()
+      diff.forEach(part => {
+        if (part.added) {
+          const lines = part.value.split('\n').filter(line => line.trim())
+          lines.forEach(line => {
+            if (line.trim()) {
+              console.log(pc.green(`+ ${line.trim()}`))
+            }
+          })
+        } else if (part.removed) {
+          const lines = part.value.split('\n').filter(line => line.trim())
+          lines.forEach(line => {
+            if (line.trim()) {
+              console.log(pc.red(`- ${line.trim()}`))
+            }
+          })
+        }
+      })
+    }
+
+    const proceed = options.yes ? true : await confirm({ 
+      message: `Apply enhancements to ${analysis.file}?`,
+      initialValue: true
+    })
+
+    if (proceed) {
+      try {
+        const newContent = await replaceEnhancedSQLInMigrationFile(
+          analysis.filePath, 
+          analysis.enhanced.enhanced.up, 
+          analysis.enhanced.enhanced.down
+        )
+        await fs.writeFile(analysis.filePath, newContent, 'utf-8')
+        console.log(pc.green(`✓ Enhanced ${analysis.file}`))
+        changesApplied++
+      } catch (error) {
+        console.log(pc.yellow(`⚠ Could not automatically enhance ${analysis.file}`))
+        console.log(pc.gray(`  Error: ${error}`))
+      }
+    } else {
+      console.log(pc.gray(`• Skipped ${analysis.file}`))
     }
   }
 
-  if (changesApplied === 0 && analyses.every(a => !a.hasChanges)) {
-    console.log(pc.gray('\n◇  No enhancements needed for any migration files.'))
-  } else {
-    console.log(pc.green(`\n✅ Applied ${changesApplied} enhancement(s) to migration files.`))
+  if (changesApplied > 0) {
+    console.log()
+    console.log(pc.green(`✓ Applied ${changesApplied} enhancement(s) to migration files`))
   }
-  spinner.succeed('✅ Enhancement analysis completed.')
 }
 
 function extractSQLFromMigrationFile(content: string): string {
@@ -341,57 +395,57 @@ function extractSQLFromMigrationFile(content: string): string {
     /queryRunner\.query\s*\(\s*[`"']([^`"']+)[`"']/g,
     /sql\s*`([^`]+)`/g,
     /"((?:CREATE|ALTER|DROP|INSERT|UPDATE|DELETE)[^"]+)"/gi
-  ];
-  let extractedSQL = '';
+  ]
+  let extractedSQL = ''
   for (const pattern of sqlPatterns) {
-    let match;
+    let match
     while ((match = pattern.exec(content)) !== null) {
-      extractedSQL += match[1] + ';\n';
+      extractedSQL += match[1] + ';\n'
     }
   }
-  return extractedSQL || content;
+  return extractedSQL || content
 }
 
 async function replaceEnhancedSQLInMigrationFile(filePath: string, upSQL: string, downSQL?: string): Promise<string> {
-  const content = await fs.readFile(filePath, 'utf-8');
-  let updatedContent = content;
+  const content = await fs.readFile(filePath, 'utf-8')
+  let updatedContent = content
 
   // Generate enhancement comment header
-  const fileName = path.basename(filePath);
-  const enhancementComment = generateEnhancementComment(fileName, upSQL);
+  const fileName = path.basename(filePath)
+  const enhancementComment = generateEnhancementComment(fileName, upSQL)
 
   // Add comment at the top of the file if it doesn't already exist
   if (!updatedContent.includes('Enhanced by DriftJS')) {
-    const lines = updatedContent.split('\n');
-    let insertIndex = 0;
+    const lines = updatedContent.split('\n')
+    let insertIndex = 0
     
     // Skip existing comments and imports to find insertion point
     for (let i = 0; i < lines.length; i++) {
-      const line = lines[i].trim();
+      const line = lines[i].trim()
       if (line && !line.startsWith('//') && !line.startsWith('/*') && !line.startsWith('*') && !line.startsWith('import') && !line.startsWith('export')) {
-        insertIndex = i;
-        break;
+        insertIndex = i
+        break
       }
     }
     
-    lines.splice(insertIndex, 0, enhancementComment, '');
-    updatedContent = lines.join('\n');
+    lines.splice(insertIndex, 0, enhancementComment, '')
+    updatedContent = lines.join('\n')
   }
 
-  updatedContent = updatedContent.replace(/queryRunner\.query\s*\(\s*[`"']([^`"']+)[`"']/g, `queryRunner.query(\`${upSQL.trim()}\`)`);
-  updatedContent = updatedContent.replace(/sql\s*`([^`]+)`/g, `sql\`${upSQL.trim()}\``);
-  updatedContent = updatedContent.replace(/"((?:CREATE|ALTER|DROP|INSERT|UPDATE|DELETE)[^"]+)"/gi, `"${upSQL.trim()}"`);
+  updatedContent = updatedContent.replace(/queryRunner\.query\s*\(\s*[`"']([^`"']+)[`"']/g, `queryRunner.query(\`${upSQL.trim()}\`)`)
+  updatedContent = updatedContent.replace(/sql\s*`([^`]+)`/g, `sql\`${upSQL.trim()}\``)
+  updatedContent = updatedContent.replace(/"((?:CREATE|ALTER|DROP|INSERT|UPDATE|DELETE)[^"]+)"/gi, `"${upSQL.trim()}"`)
 
   if (downSQL) {
-    updatedContent = updatedContent.replace(/(public async down\(.*?\): Promise<void> \{[\s\S]*?queryRunner\.query\s*\(\s*[`"'])([^`"']+)([`"'])/, `$1${downSQL.trim()}$3`);
+    updatedContent = updatedContent.replace(/(public async down\(.*?\): Promise<void> \{[\s\S]*?queryRunner\.query\s*\(\s*[`"'])([^`"']+)([`"'])/, `$1${downSQL.trim()}$3`)
   }
 
-  return updatedContent;
+  return updatedContent
 }
 
 function generateEnhancementComment(fileName: string, enhancedSQL: string): string {
-  const timestamp = new Date().toISOString().split('T')[0];
-  const operations = analyzeEnhancements(enhancedSQL);
+  const timestamp = new Date().toISOString().split('T')[0]
+  const operations = analyzeEnhancements(enhancedSQL)
   
   const header = `/*
  * Migration Enhanced by DriftJS.com
@@ -400,56 +454,56 @@ function generateEnhancementComment(fileName: string, enhancedSQL: string): stri
  * 
  * This migration has been optimized for production safety and performance.
  * Learn more at https://driftjs.com
- */`;
+ */`
 
   if (operations.length === 1) {
     return `${header.slice(0, -2)}
  * 
  * Enhancement: ${operations[0]}
- */`;
+ */`
   } else if (operations.length > 1) {
-    const enhancementList = operations.map(op => ` * - ${op}`).join('\n');
+    const enhancementList = operations.map(op => ` * - ${op}`).join('\n')
     return `${header.slice(0, -2)}
  * 
  * Enhancements Applied:
 ${enhancementList}
- */`;
+ */`
   }
   
-  return header;
+  return header
 }
 
 function analyzeEnhancements(sql: string): string[] {
-  const enhancements: string[] = [];
-  const sqlLower = sql.toLowerCase();
+  const enhancements: string[] = []
+  const sqlLower = sql.toLowerCase()
   
   // Detect common enhancement patterns
   if (sqlLower.includes('add constraint') && sqlLower.includes('not valid')) {
-    enhancements.push('Safe constraint addition with NOT VALID optimization');
+    enhancements.push('Safe constraint addition with NOT VALID optimization')
   }
   if (sqlLower.includes('concurrently')) {
-    enhancements.push('Non-blocking concurrent index creation');
+    enhancements.push('Non-blocking concurrent index creation')
   }
   if (sqlLower.includes('backup') || sqlLower.includes('copy')) {
-    enhancements.push('Data backup created before destructive operations');
+    enhancements.push('Data backup created before destructive operations')
   }
   if (sqlLower.includes('alter table') && sqlLower.includes('add column') && !sqlLower.includes('not null')) {
-    enhancements.push('Nullable column added first for safe NOT NULL migration');
+    enhancements.push('Nullable column added first for safe NOT NULL migration')
   }
   if (sqlLower.includes('validate constraint')) {
-    enhancements.push('Constraint validation separated for reduced downtime');
+    enhancements.push('Constraint validation separated for reduced downtime')
   }
   if (sqlLower.includes('lock timeout') || sqlLower.includes('statement_timeout')) {
-    enhancements.push('Query timeouts configured to prevent long locks');
+    enhancements.push('Query timeouts configured to prevent long locks')
   }
   if (sqlLower.includes('begin;') && sqlLower.includes('commit;')) {
-    enhancements.push('Transaction boundaries optimized for safety');
+    enhancements.push('Transaction boundaries optimized for safety')
   }
   
   // Default if no specific enhancements detected
   if (enhancements.length === 0) {
-    enhancements.push('Production-ready migration optimizations applied');
+    enhancements.push('Production-ready migration optimizations applied')
   }
   
-  return enhancements;
+  return enhancements
 }
