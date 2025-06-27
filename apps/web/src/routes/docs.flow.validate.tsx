@@ -1,30 +1,103 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { CodeBlock } from "@/components/ui/code-block";
-
-function FlowValidatePage() {
-  return (
-    <section className="mx-auto max-w-3xl px-4 py-16">
-      <h1 className="mb-4 text-4xl font-semibold lowercase">validate</h1>
-      <p className="text-muted-foreground mb-8">
-        <code>flow validate</code> checks that every applied migration matches the
-        checksum of the file on disk and that the migration sequence has no
-        gaps. Run this in CI to guarantee consistency between code and
-        production.
-      </p>
-
-      <h2 className="mb-2 text-xl font-medium lowercase">exit codes</h2>
-      <ul className="list-disc space-y-2 pl-5 text-muted-foreground">
-        <li><strong>0</strong> – all good.</li>
-        <li><strong>2</strong> – checksum mismatch.</li>
-        <li><strong>3</strong> – missing migration file.</li>
-      </ul>
-
-      <h2 className="mb-2 text-xl font-medium lowercase">ci example</h2>
-      <CodeBlock language="bash" code={`flow validate --json > validate.json`} />
-    </section>
-  );
-}
+import DocsLayout from "@/components/docs/docs-layout"
 
 export const Route = createFileRoute("/docs/flow/validate")({
-  component: FlowValidatePage,
-}); 
+  component: RouteComponent,
+});
+
+function RouteComponent() {
+  return (
+    <DocsLayout>
+      <div className="prose prose-gray dark:prose-invert max-w-none">
+        <h1>🔍 flow validate</h1>
+        <p className="lead">
+          Validate database migrations for potential safety issues and problems before applying enhancements or running migrations.
+        </p>
+
+        <h2>Quick Start</h2>
+        <pre>
+          <code>
+{`# Validate latest migration automatically
+flow validate
+
+# Validate specific migration file  
+flow validate migrations/20240101000001_add_users.sql
+
+# Validate in specific project directory
+flow validate --project ./backend`}
+          </code>
+        </pre>
+
+        <h2>Overview</h2>
+        <p>
+          The <code>flow validate</code> command performs a comprehensive safety analysis on your migration files without making any changes. It's perfect for CI/CD pipelines, pre-commit hooks, and general development workflows to catch issues early.
+        </p>
+
+        <h2>What It Validates</h2>
+        <h3>🛡️ Safety Issues</h3>
+        <ul>
+            <li>Unsafe NOT NULL column additions</li>
+            <li>DROP operations without backup recommendations</li>
+            <li>Long-locking operations</li>
+            <li>Risky CASCADE DELETE operations</li>
+            <li>Unsafe data type changes</li>
+            <li>Constraint violations</li>
+        </ul>
+
+        <h3>⚡ Performance Opportunities</h3>
+        <ul>
+            <li>Missing beneficial indexes</li>
+            <li>Operations that could be made concurrent</li>
+            <li>Large operations that could be batched</li>
+        </ul>
+
+        <h2>Command Options</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Option</th>
+              <th>Description</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>[file]</code></td>
+              <td>Specific migration file to validate (optional, defaults to latest)</td>
+            </tr>
+            <tr>
+              <td><code>--project &lt;path&gt;</code></td>
+              <td>Path to your project directory</td>
+            </tr>
+            <tr>
+              <td><code>--all</code></td>
+              <td>Validate all migration files</td>
+            </tr>
+            <tr>
+              <td><code>--json</code></td>
+              <td>Output results in JSON format for scripting</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h2>Integration Example (CI/CD)</h2>
+        <pre>
+          <code>
+{`# GitHub Actions Workflow
+name: Validate Migrations
+on: [push, pull_request]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install Flow CLI
+        run: npm install -g @driftjs/flow
+      - name: Validate Migrations
+        run: flow validate --all`}
+          </code>
+        </pre>
+      </div>
+    </DocsLayout>
+  );
+} 

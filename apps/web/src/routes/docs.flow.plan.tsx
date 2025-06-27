@@ -1,65 +1,86 @@
 import { createFileRoute } from '@tanstack/react-router'
+import DocsLayout from '@/components/docs/docs-layout'
 
 export const Route = createFileRoute('/docs/flow/plan')({
-  component: FlowPlanDoc,
+  component: RouteComponent,
 })
 
-function FlowPlanDoc() {
+function RouteComponent() {
   return (
-    <div className="prose prose-lg max-w-4xl mx-auto p-6">
-      <div className="not-prose mb-8">
-        <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-cyan-500 bg-clip-text text-transparent">
-          📋 flow plan
-        </h1>
-        <p className="text-xl text-gray-600 mt-2">
-          Preview enhancement changes without applying them
+    <DocsLayout>
+      <div className="prose prose-gray dark:prose-invert max-w-none">
+        <h1>📋 flow plan</h1>
+        <p className="lead">
+          Preview enhancement changes for a migration file without applying them. See exactly what Flow would modify before committing to any changes.
         </p>
+
+        <h2>Quick Start</h2>
+        <pre>
+          <code>
+{`# Preview enhancements for latest migration
+flow plan
+
+# Preview enhancements for specific file
+flow plan migrations/20240101000001_add_users.sql
+
+# Generate plan for specific project
+flow plan --project ./backend`}
+          </code>
+        </pre>
+
+        <h2>Overview</h2>
+        <p>
+          The <code>flow plan</code> command is your "dry-run preview" that shows exactly what changes Flow would make to your migration files. It's perfect for code reviews, verification, and learning what Flow's enhancements do.
+        </p>
+
+        <h2>Command Options</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Option</th>
+              <th>Description</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>[file]</code></td>
+              <td>Migration file to plan for (optional, defaults to latest)</td>
+            </tr>
+            <tr>
+              <td><code>--project &lt;path&gt;</code></td>
+              <td>Path to your project directory</td>
+            </tr>
+            <tr>
+              <td><code>--format &lt;format&gt;</code></td>
+              <td>Output format (text, json, markdown)</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h2>Integration Example (CI/CD)</h2>
+        <p>
+          You can use <code>flow plan</code> in your CI/CD pipeline to automatically comment on pull requests with a summary of proposed changes.
+        </p>
+        <pre>
+          <code>
+{`# GitHub Actions: Comment PR with Enhancement Plan
+- name: Generate Enhancement Plan
+  run: flow plan --format markdown > enhancement-plan.md
+- name: Comment PR with Plan
+  uses: actions/github-script@v6
+  with:
+    script: |
+      const fs = require('fs');
+      const plan = fs.readFileSync('enhancement-plan.md', 'utf8');
+      github.rest.issues.createComment({
+        issue_number: context.issue.number,
+        owner: context.repo.owner,
+        repo: context.repo.repo,
+        body: \`## 🚀 Flow Enhancement Plan\n\n\${plan}\`
+      });`}
+          </code>
+        </pre>
       </div>
-
-      {/* Quick Start */}
-      <section className="mb-8">
-        <h2 className="text-2xl font-semibold mb-4">Quick Start</h2>
-        
-        <div className="bg-gray-900 text-green-400 p-4 rounded-lg font-mono text-sm mb-4">
-          <span className="text-gray-500"># Plan enhancements for latest migration</span><br/>
-          <span className="text-yellow-400">$</span> flow plan<br/><br/>
-          
-          <span className="text-gray-500"># Plan specific migration file</span><br/>
-          <span className="text-yellow-400">$</span> flow plan migrations/add_users.sql<br/><br/>
-          
-          <span className="text-gray-500"># Detailed analysis output</span><br/>
-          <span className="text-yellow-400">$</span> flow plan --verbose
-        </div>
-      </section>
-
-      {/* Example Output */}
-      <section className="mb-8">
-        <h2 className="text-2xl font-semibold mb-4">Example Planning Output</h2>
-        
-        <div className="bg-gray-900 text-green-400 p-4 rounded-lg font-mono text-sm">
-          <div className="text-cyan-400 mb-2">📋 Enhancement Plan for: add_users_table.sql</div>
-          <br/>
-          <div className="text-yellow-400">🛡️ Safety Enhancements (3 found):</div>
-          <div className="ml-4 space-y-1 text-sm">
-            <div className="text-red-400">• Transaction Wrapper - Wrap operations in BEGIN/COMMIT</div>
-            <div className="text-orange-400">• Drop Table Safeguard - Add IF EXISTS clause</div>
-            <div className="text-yellow-400">• Backup Recommendation - Suggest backup before destructive ops</div>
-          </div>
-          <br/>
-          <div className="text-green-400">⚡ Speed Enhancements (2 found):</div>
-          <div className="ml-4 space-y-1 text-sm">
-            <div className="text-green-400">• Concurrent Index - Make index creation non-blocking</div>
-            <div className="text-blue-400">• Batch Insert - Optimize multiple INSERT statements</div>
-          </div>
-          <br/>
-          <div className="text-white">📊 Impact Analysis:</div>
-          <div className="ml-4 space-y-1 text-sm">
-            <div>• Risk Reduction: <span className="text-green-400">High</span></div>
-            <div>• Performance Impact: <span className="text-blue-400">Medium</span></div>
-            <div>• Complexity Added: <span className="text-yellow-400">Low</span></div>
-          </div>
-        </div>
-      </section>
-    </div>
+    </DocsLayout>
   )
 } 

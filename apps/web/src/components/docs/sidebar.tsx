@@ -1,6 +1,7 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
+import { cn } from "@/lib/utils";
 
 interface NavGroup {
   label: string;
@@ -28,13 +29,13 @@ const flowNav: NavGroup[] = [
   {
     label: "commands",
     children: [
-      { label: "generate", href: "/docs/flow/generate" },
-      { label: "apply", href: "/docs/flow/apply" },
-      { label: "status", href: "/docs/flow/status" },
-      { label: "plan", href: "/docs/flow/plan" },
+      { label: "init", href: "/docs/flow/init" },
+      { label: "enhance", href: "/docs/flow/enhance" },
       { label: "validate", href: "/docs/flow/validate" },
-      { label: "history", href: "/docs/flow/history" },
+      { label: "plan", href: "/docs/flow/plan" },
       { label: "rollback", href: "/docs/flow/rollback" },
+      { label: "status", href: "/docs/flow/status" },
+      { label: "config", href: "/docs/flow/config" },
       { label: "ci/cd", href: "/docs/flow/ci" },
     ],
   },
