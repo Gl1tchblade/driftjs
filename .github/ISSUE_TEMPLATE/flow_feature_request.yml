@@ -1,0 +1,82 @@
+name: "✨ Flow Feature Request"
+description: "Suggest an idea or improvement for the Flow migration enhancement tool."
+labels: ["enhancement", "flow"]
+title: "[Feature]: <brief description>"
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Thanks for your interest in improving Flow!
+        Please search existing issues before filing a new one to avoid duplicates.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: "Problem Statement"
+      description: "What problem are you trying to solve? Why is it important?"
+      placeholder: |
+        When working with zero-downtime migrations we need ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: "Proposed Solution / Feature"
+      description: "Describe the feature or enhancement you'd like to see."
+      placeholder: |
+        1. Add a new safety enhancer that detects ...
+        2. CLI flag `--skip-backup-warning` to ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: "Current Alternatives / Workarounds"
+      description: "If you have found ways around the problem, list them here."
+      placeholder: |
+        Currently we manually edit the SQL to ...
+    validations:
+      required: false
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: "Feature Scope"
+      options:
+        - CLI / Commands
+        - Enhancement Engine (Safety)
+        - Enhancement Engine (Speed)
+        - Config & Settings
+        - Documentation
+        - Other
+      multiple: true
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: "Additional Context"
+      description: "Any mock-ups, references, or contextual information that might help."
+    validations:
+      required: false
+
+  - type: input
+    id: flow_version
+    attributes:
+      label: "Flow Version (optional)"
+      placeholder: "e.g. 0.3.2"
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: willingness
+    attributes:
+      label: "Are you willing to implement this feature?"
+      options:
+        - label: "Yes, I would like to work on a PR."
+          required: false 
