@@ -12,6 +12,7 @@ function FlowInstallationPage() {
 
       <CodeBlockSwitcher
         id="flow-install"
+        variant="fancy"
         variants={[
           { label: "npm", code: "npm install -g @driftjs/flow\nflow --help" },
           { label: "pnpm", code: "pnpm add -g @driftjs/flow\nflow --help" },

@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { CodeBlock } from '../../../components/ui/code-block'
 
-export const Route = createFileRoute('/docs/flow/examples')({
+export const Route = createFileRoute('/docs/flow/examples' as any)({
   component: FlowExamplesDoc,
 })
 
@@ -23,8 +24,10 @@ function FlowExamplesDoc() {
         <div className="grid md:grid-cols-2 gap-6">
           <div>
             <h3 className="text-lg font-medium text-red-700 mb-3">❌ Before Enhancement</h3>
-            <div className="bg-red-50 border border-red-200 p-4 rounded-lg">
-              <pre className="text-sm overflow-x-auto"><code>{`-- Basic table creation
+            <CodeBlock
+              variant="fancy"
+              language="sql"
+              code={`-- Basic table creation
 CREATE TABLE users (
     id SERIAL PRIMARY KEY,
     email VARCHAR(255) NOT NULL,
@@ -38,8 +41,8 @@ CREATE INDEX idx_users_email ON users (email);
 
 -- Add constraint without validation
 ALTER TABLE users 
-ADD CONSTRAINT unique_email UNIQUE (email);`}</code></pre>
-            </div>
+ADD CONSTRAINT unique_email UNIQUE (email);`}
+            />
             
             <div className="mt-3 text-sm">
               <h4 className="font-medium text-red-700 mb-1">⚠️ Issues:</h4>
@@ -54,8 +57,10 @@ ADD CONSTRAINT unique_email UNIQUE (email);`}</code></pre>
           
           <div>
             <h3 className="text-lg font-medium text-green-700 mb-3">✅ After Flow Enhancement</h3>
-            <div className="bg-green-50 border border-green-200 p-4 rounded-lg">
-              <pre className="text-sm overflow-x-auto"><code>{`-- Flow Enhancement: Transaction Wrapper
+            <CodeBlock
+              variant="fancy"
+              language="sql"
+              code={`-- Flow Enhancement: Transaction Wrapper
 BEGIN;
 
 -- Flow Enhancement: Backup Recommendation
@@ -85,10 +90,10 @@ ADD CONSTRAINT unique_email UNIQUE (email);
 -- Ensure email format is valid
 ALTER TABLE users 
 ADD CONSTRAINT check_email_format 
-CHECK (email ~* '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$');
+CHECK (email ~* '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$');
 
-COMMIT;`}</code></pre>
-            </div>
+COMMIT;`}
+            />
             
             <div className="mt-3 text-sm">
               <h4 className="font-medium text-green-700 mb-1">✅ Improvements:</h4>
@@ -110,8 +115,10 @@ COMMIT;`}</code></pre>
         <div className="grid md:grid-cols-2 gap-6">
           <div>
             <h3 className="text-lg font-medium text-red-700 mb-3">❌ Before Enhancement</h3>
-            <div className="bg-red-50 border border-red-200 p-4 rounded-lg">
-              <pre className="text-sm overflow-x-auto"><code>{`-- Risky column type change
+            <CodeBlock
+              variant="fancy"
+              language="sql"
+              code={`-- Risky column type change
 ALTER TABLE users 
 ALTER COLUMN age TYPE INTEGER 
 USING age::INTEGER;
@@ -125,8 +132,8 @@ INSERT INTO user_roles (user_id, role) VALUES (5, 'user');
 
 -- Dangerous column rename
 ALTER TABLE users 
-RENAME COLUMN full_name TO name;`}</code></pre>
-            </div>
+RENAME COLUMN full_name TO name;`}
+            />
             
             <div className="mt-3 text-sm">
               <h4 className="font-medium text-red-700 mb-1">⚠️ Issues:</h4>
@@ -141,8 +148,10 @@ RENAME COLUMN full_name TO name;`}</code></pre>
           
           <div>
             <h3 className="text-lg font-medium text-green-700 mb-3">✅ After Flow Enhancement</h3>
-            <div className="bg-green-50 border border-green-200 p-4 rounded-lg">
-              <pre className="text-sm overflow-x-auto"><code>{`-- Flow Enhancement: Transaction Wrapper
+            <CodeBlock
+              variant="fancy"
+              language="sql"
+              code={`-- Flow Enhancement: Transaction Wrapper
 BEGIN;
 
 -- Flow Enhancement: Data Type Change Safety
@@ -177,8 +186,8 @@ SELECT *, name AS full_name FROM users;
 ALTER TABLE users 
 RENAME COLUMN full_name TO name;
 
-COMMIT;`}</code></pre>
-            </div>
+COMMIT;`}
+            />
             
             <div className="mt-3 text-sm">
               <h4 className="font-medium text-green-700 mb-1">✅ Improvements:</h4>
@@ -200,8 +209,10 @@ COMMIT;`}</code></pre>
         <div className="grid md:grid-cols-2 gap-6">
           <div>
             <h3 className="text-lg font-medium text-red-700 mb-3">❌ Before Enhancement</h3>
-            <div className="bg-red-50 border border-red-200 p-4 rounded-lg">
-              <pre className="text-sm overflow-x-auto"><code>{`-- Inefficient index creation
+            <CodeBlock
+              variant="fancy"
+              language="sql"
+              code={`-- Inefficient index creation
 CREATE INDEX idx_posts_content ON posts (content);
 CREATE INDEX idx_posts_title ON posts (title);
 CREATE INDEX idx_posts_author ON posts (author_id);
@@ -211,8 +222,8 @@ CREATE INDEX idx_posts_complex ON posts (
 );
 
 -- No consideration for query patterns
-CREATE INDEX idx_users_description ON users (description);`}</code></pre>
-            </div>
+CREATE INDEX idx_users_description ON users (description);`}
+            />
             
             <div className="mt-3 text-sm">
               <h4 className="font-medium text-red-700 mb-1">⚠️ Issues:</h4>
@@ -227,8 +238,10 @@ CREATE INDEX idx_users_description ON users (description);`}</code></pre>
           
           <div>
             <h3 className="text-lg font-medium text-green-700 mb-3">✅ After Flow Enhancement</h3>
-            <div className="bg-green-50 border border-green-200 p-4 rounded-lg">
-              <pre className="text-sm overflow-x-auto"><code>{`-- Flow Enhancement: Smart Index Analysis
+            <CodeBlock
+              variant="fancy"
+              language="sql"
+              code={`-- Flow Enhancement: Smart Index Analysis
 BEGIN;
 
 -- Flow Enhancement: Index Effectiveness Warning
@@ -250,27 +263,21 @@ CREATE INDEX CONCURRENTLY idx_posts_status
 ON posts (status) 
 WHERE status IN ('published', 'draft');
 
--- Flow Enhancement: Composite Index Optimization
--- Simplified composite index based on query patterns
-CREATE INDEX CONCURRENTLY idx_posts_author_status_created 
-ON posts (author_id, status, created_at DESC);
+-- Flow Enhancement: Complex Index Warning
+-- WARNING: Complex composite index with 6 columns
+-- Consider simplifying or using partial indexes
+-- SKIPPED: CREATE INDEX idx_posts_complex ON posts (title, content, author_id, status, created_at, tags);
 
--- Flow Enhancement: Partial Index Suggestion
--- More efficient partial index for text search
-CREATE INDEX CONCURRENTLY idx_users_description_partial 
-ON users (description) 
-WHERE description IS NOT NULL AND length(description) > 10;
-
-COMMIT;`}</code></pre>
-            </div>
+COMMIT;`}
+            />
             
             <div className="mt-3 text-sm">
-              <h4 className="font-medium text-green-700 mb-1">✅ Smart Analysis:</h4>
+              <h4 className="font-MEdium text-green-700 mb-1">✅ Improvements:</h4>
               <ul className="text-green-600 space-y-1">
-                <li>• Skipped inefficient text index</li>
-                <li>• Prioritized foreign key indexes</li>
-                <li>• Used partial indexes effectively</li>
-                <li>• Optimized composite index order</li>
+                <li>• Skips ineffective indexes</li>
+                <li>• Creates indexes concurrently</li>
+                <li>• Uses partial indexes</li>
+                <li>• Warns about complex indexes</li>
               </ul>
             </div>
           </div>

@@ -12,6 +12,7 @@ interface CodeBlockSwitcherProps {
   id: string; // unique id to persist selection
   variants: Variant[];
   className?: string;
+  variant?: "default" | "fancy";
 }
 
 // NEW: simple clipboard utility used by header copy button
@@ -31,7 +32,12 @@ function useCopy(text: string) {
   return { copied, copy };
 }
 
-export function CodeBlockSwitcher({ id, variants, className }: CodeBlockSwitcherProps) {
+export function CodeBlockSwitcher({
+  id,
+  variants,
+  className,
+  variant,
+}: CodeBlockSwitcherProps) {
   const storageKey = `codeBlockSwitcher:${id}`;
 
   const [index, setIndex] = useState(0);
@@ -119,6 +125,7 @@ export function CodeBlockSwitcher({ id, variants, className }: CodeBlockSwitcher
         language={current.language ?? "bash"}
         className="rounded-none border-none bg-transparent my-0"
         showCopy={false} // hide internal copy button – we render our own in header
+        variant={variant}
       />
     </div>
   );

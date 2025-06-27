@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { CodeBlock } from '@/components/ui/code-block'
 
-export const Route = createFileRoute('/docs/flow/commands')({
+export const Route = createFileRoute('/docs/flow/commands' as any)({
   component: FlowCommandsDoc,
 })
 
@@ -30,19 +31,20 @@ function FlowCommandsDoc() {
               Intelligently enhance database migrations with safety and performance improvements through an interactive two-phase process.
             </p>
             
-            <div className="bg-gray-900 text-green-400 p-4 rounded-lg font-mono text-sm mb-4">
-              <span className="text-gray-500"># Enhance latest migration automatically</span><br/>
-              <span className="text-yellow-400">$</span> flow enhance<br/><br/>
-              
-              <span className="text-gray-500"># Enhance specific migration file</span><br/>
-              <span className="text-yellow-400">$</span> flow enhance migrations/20240101000001_add_users.sql<br/><br/>
-              
-              <span className="text-gray-500"># Preview changes without applying</span><br/>
-              <span className="text-yellow-400">$</span> flow enhance --dry-run<br/><br/>
-              
-              <span className="text-gray-500"># Verbose output with detailed analysis</span><br/>
-              <span className="text-yellow-400">$</span> flow enhance --verbose
-            </div>
+            <CodeBlock
+              variant="fancy"
+              code={`# Enhance latest migration automatically
+$ flow enhance
+
+# Enhance specific migration file
+$ flow enhance migrations/20240101000001_add_users.sql
+
+# Preview changes without applying
+$ flow enhance --dry-run
+
+# Verbose output with detailed analysis
+$ flow enhance --verbose`}
+            />
 
             <div className="grid md:grid-cols-2 gap-4">
               <div>
@@ -81,19 +83,20 @@ function FlowCommandsDoc() {
               Validate migrations for potential issues without applying enhancements. Perfect for CI/CD pipelines.
             </p>
             
-            <div className="bg-gray-900 text-green-400 p-4 rounded-lg font-mono text-sm mb-4">
-              <span className="text-gray-500"># Validate latest migration</span><br/>
-              <span className="text-yellow-400">$</span> flow validate<br/><br/>
-              
-              <span className="text-gray-500"># Validate specific migration</span><br/>
-              <span className="text-yellow-400">$</span> flow validate migrations/add_users.sql<br/><br/>
-              
-              <span className="text-gray-500"># Validate all migrations</span><br/>
-              <span className="text-yellow-400">$</span> flow validate --all<br/><br/>
-              
-              <span className="text-gray-500"># Strict mode - fail on warnings</span><br/>
-              <span className="text-yellow-400">$</span> flow validate --strict
-            </div>
+            <CodeBlock
+              variant="fancy"
+              code={`# Validate latest migration
+$ flow validate
+
+# Validate specific migration
+$ flow validate migrations/add_users.sql
+
+# Validate all migrations
+$ flow validate --all
+
+# Strict mode - fail on warnings
+$ flow validate --strict`}
+            />
           </div>
 
           {/* Plan Command */}
@@ -105,19 +108,20 @@ function FlowCommandsDoc() {
               Preview enhancement changes without applying them. See exactly what Flow will do before committing.
             </p>
             
-            <div className="bg-gray-900 text-green-400 p-4 rounded-lg font-mono text-sm mb-4">
-              <span className="text-gray-500"># Plan enhancements for latest migration</span><br/>
-              <span className="text-yellow-400">$</span> flow plan<br/><br/>
-              
-              <span className="text-gray-500"># Plan specific migration file</span><br/>
-              <span className="text-yellow-400">$</span> flow plan migrations/add_users.sql<br/><br/>
-              
-              <span className="text-gray-500"># Detailed analysis output</span><br/>
-              <span className="text-yellow-400">$</span> flow plan --verbose<br/><br/>
-              
-              <span className="text-gray-500"># Export plan to file</span><br/>
-              <span className="text-yellow-400">$</span> flow plan --output plan.json
-            </div>
+            <CodeBlock
+              variant="fancy"
+              code={`# Plan enhancements for latest migration
+$ flow plan
+
+# Plan specific migration file
+$ flow plan migrations/add_users.sql
+
+# Detailed analysis output
+$ flow plan --verbose
+
+# Export plan to file
+$ flow plan --output plan.json`}
+            />
           </div>
 
           {/* Rollback Command */}
@@ -129,19 +133,20 @@ function FlowCommandsDoc() {
               Safely rollback enhanced migrations with automatic down script generation and safety checks.
             </p>
             
-            <div className="bg-gray-900 text-green-400 p-4 rounded-lg font-mono text-sm mb-4">
-              <span className="text-gray-500"># Rollback latest migration</span><br/>
-              <span className="text-yellow-400">$</span> flow rollback<br/><br/>
-              
-              <span className="text-gray-500"># Rollback specific migration</span><br/>
-              <span className="text-yellow-400">$</span> flow rollback migrations/add_users.sql<br/><br/>
-              
-              <span className="text-gray-500"># Generate rollback script without executing</span><br/>
-              <span className="text-yellow-400">$</span> flow rollback --generate-only<br/><br/>
-              
-              <span className="text-gray-500"># Force rollback (skip confirmations)</span><br/>
-              <span className="text-yellow-400">$</span> flow rollback --force
-            </div>
+            <CodeBlock
+              variant="fancy"
+              code={`# Rollback latest migration
+$ flow rollback
+
+# Rollback specific migration
+$ flow rollback migrations/add_users.sql
+
+# Generate rollback script without executing
+$ flow rollback --generate-only
+
+# Force rollback (skip confirmations)
+$ flow rollback --force`}
+            />
           </div>
         </div>
       </section>
@@ -160,19 +165,20 @@ function FlowCommandsDoc() {
               Initialize Flow in your project with automatic ORM detection and configuration setup.
             </p>
             
-            <div className="bg-gray-900 text-green-400 p-4 rounded-lg font-mono text-sm mb-4">
-              <span className="text-gray-500"># Initialize Flow in current directory</span><br/>
-              <span className="text-yellow-400">$</span> flow init<br/><br/>
-              
-              <span className="text-gray-500"># Non-interactive mode with defaults</span><br/>
-              <span className="text-yellow-400">$</span> flow init --yes<br/><br/>
-              
-              <span className="text-gray-500"># Initialize with custom database URL</span><br/>
-              <span className="text-yellow-400">$</span> flow init --db-url postgresql://user:pass@localhost:5432/mydb<br/><br/>
-              
-              <span className="text-gray-500"># Skip ORM detection</span><br/>
-              <span className="text-yellow-400">$</span> flow init --no-detect
-            </div>
+            <CodeBlock
+              variant="fancy"
+              code={`# Initialize Flow in current directory
+$ flow init
+
+# Non-interactive mode with defaults
+$ flow init --yes
+
+# Initialize with custom database URL
+$ flow init --db-url postgresql://user:pass@localhost:5432/mydb
+
+# Skip ORM detection
+$ flow init --no-detect`}
+            />
           </div>
 
           {/* Config Command */}
@@ -184,22 +190,23 @@ function FlowCommandsDoc() {
               Manage Flow configuration settings and multiple environments.
             </p>
             
-            <div className="bg-gray-900 text-green-400 p-4 rounded-lg font-mono text-sm mb-4">
-              <span className="text-gray-500"># View current configuration</span><br/>
-              <span className="text-yellow-400">$</span> flow config show<br/><br/>
-              
-              <span className="text-gray-500"># Set database URL for environment</span><br/>
-              <span className="text-yellow-400">$</span> flow config set development.db_connection_string "postgresql://..."<br/><br/>
-              
-              <span className="text-gray-500"># Enable/disable enhancements</span><br/>
-              <span className="text-yellow-400">$</span> flow config set enhancements.enableSpeedEnhancements false<br/><br/>
-              
-              <span className="text-gray-500"># Add new environment</span><br/>
-              <span className="text-yellow-400">$</span> flow config add-env staging<br/><br/>
-              
-              <span className="text-gray-500"># Reset to defaults</span><br/>
-              <span className="text-yellow-400">$</span> flow config reset
-            </div>
+            <CodeBlock
+              variant="fancy"
+              code={`# View current configuration
+$ flow config show
+
+# Set database URL for environment
+$ flow config set development.db_connection_string "postgresql://..."
+
+# Enable/disable enhancements
+$ flow config set enhancements.enableSpeedEnhancements false
+
+# Add new environment
+$ flow config add-env staging
+
+# Reset to defaults
+$ flow config reset`}
+            />
           </div>
 
           {/* Status Command */}
@@ -211,19 +218,20 @@ function FlowCommandsDoc() {
               Check enhancement status and migration statistics across your project.
             </p>
             
-            <div className="bg-gray-900 text-green-400 p-4 rounded-lg font-mono text-sm mb-4">
-              <span className="text-gray-500"># Show overall project status</span><br/>
-              <span className="text-yellow-400">$</span> flow status<br/><br/>
-              
-              <span className="text-gray-500"># Detailed migration analysis</span><br/>
-              <span className="text-yellow-400">$</span> flow status --detailed<br/><br/>
-              
-              <span className="text-gray-500"># Check specific environment</span><br/>
-              <span className="text-yellow-400">$</span> flow status --env production<br/><br/>
-              
-              <span className="text-gray-500"># Export status report</span><br/>
-              <span className="text-yellow-400">$</span> flow status --export status-report.json
-            </div>
+            <CodeBlock
+              variant="fancy"
+              code={`# Show overall project status
+$ flow status
+
+# Detailed migration analysis
+$ flow status --detailed
+
+# Check specific environment
+$ flow status --env production
+
+# Export status report
+$ flow status --export status-report.json`}
+            />
           </div>
         </div>
       </section>
@@ -248,34 +256,24 @@ function FlowCommandsDoc() {
                 <td className="px-6 py-4 text-sm font-mono">flow enhance --help</td>
               </tr>
               <tr>
-                <td className="px-6 py-4 text-sm font-mono bg-gray-50">--version, -V</td>
-                <td className="px-6 py-4 text-sm text-gray-900">Show Flow CLI version</td>
+                <td className="px-6 py-4 text-sm font-mono bg-gray-50">--version, -v</td>
+                <td className="px-6 py-4 text-sm text-gray-900">Show version number</td>
                 <td className="px-6 py-4 text-sm font-mono">flow --version</td>
               </tr>
               <tr>
-                <td className="px-6 py-4 text-sm font-mono bg-gray-50">--verbose, -v</td>
-                <td className="px-6 py-4 text-sm text-gray-900">Enable detailed logging</td>
-                <td className="px-6 py-4 text-sm font-mono">flow enhance -v</td>
+                <td className="px-6 py-4 text-sm font-mono bg-gray-50">--project &lt;path&gt;</td>
+                <td className="px-6 py-4 text-sm text-gray-900">Specify project path</td>
+                <td className="px-6 py-4 text-sm font-mono">flow enhance --project ./backend</td>
               </tr>
               <tr>
-                <td className="px-6 py-4 text-sm font-mono bg-gray-50">--config, -c</td>
-                <td className="px-6 py-4 text-sm text-gray-900">Specify config file path</td>
-                <td className="px-6 py-4 text-sm font-mono">flow enhance -c ./custom.config.json</td>
+                <td className="px-6 py-4 text-sm font-mono bg-gray-50">--no-color</td>
+                <td className="px-6 py-4 text-sm text-gray-900">Disable color output</td>
+                <td className="px-6 py-4 text-sm font-mono">flow status --no-color</td>
               </tr>
               <tr>
-                <td className="px-6 py-4 text-sm font-mono bg-gray-50">--env, -e</td>
-                <td className="px-6 py-4 text-sm text-gray-900">Target environment</td>
-                <td className="px-6 py-4 text-sm font-mono">flow enhance --env production</td>
-              </tr>
-              <tr>
-                <td className="px-6 py-4 text-sm font-mono bg-gray-50">--dry-run</td>
-                <td className="px-6 py-4 text-sm text-gray-900">Preview changes without applying</td>
-                <td className="px-6 py-4 text-sm font-mono">flow enhance --dry-run</td>
-              </tr>
-              <tr>
-                <td className="px-6 py-4 text-sm font-mono bg-gray-50">--force</td>
-                <td className="px-6 py-4 text-sm text-gray-900">Skip confirmations (dangerous)</td>
-                <td className="px-6 py-4 text-sm font-mono">flow rollback --force</td>
+                <td className="px-6 py-4 text-sm font-mono bg-gray-50">--quiet, -q</td>
+                <td className="px-6 py-4 text-sm text-gray-900">Suppress all output</td>
+                <td className="px-6 py-4 text-sm font-mono">flow enhance -q</td>
               </tr>
             </tbody>
           </table>

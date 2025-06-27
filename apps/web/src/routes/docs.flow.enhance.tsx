@@ -1,4 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { CodeBlock } from '@/components/ui/code-block'
 
 export const Route = createFileRoute('/docs/flow/enhance')({
   component: FlowEnhanceDoc,
@@ -20,16 +21,17 @@ function FlowEnhanceDoc() {
       <section className="mb-8">
         <h2 className="text-2xl font-semibold mb-4">Quick Start</h2>
         
-        <div className="bg-gray-900 text-green-400 p-4 rounded-lg font-mono text-sm mb-4">
-          <span className="text-gray-500"># Enhance latest migration automatically</span><br/>
-          <span className="text-yellow-400">$</span> flow enhance<br/><br/>
-          
-          <span className="text-gray-500"># Enhance specific migration file</span><br/>
-          <span className="text-yellow-400">$</span> flow enhance migrations/20240101000001_add_users.sql<br/><br/>
-          
-          <span className="text-gray-500"># Preview changes without applying</span><br/>
-          <span className="text-yellow-400">$</span> flow enhance --dry-run
-        </div>
+        <CodeBlock
+          variant="fancy"
+          code={`# Enhance latest migration automatically
+$ flow enhance
+
+# Enhance specific migration file
+$ flow enhance migrations/20240101000001_add_users.sql
+
+# Preview changes without applying
+$ flow enhance --dry-run`}
+        />
       </section>
 
       {/* Two-Phase Process */}
@@ -219,21 +221,25 @@ function FlowEnhanceDoc() {
             <div className="grid md:grid-cols-2 gap-4">
               <div>
                 <h4 className="text-sm font-medium text-red-700 mb-2">❌ Before Enhancement</h4>
-                <div className="bg-red-50 border border-red-200 p-4 rounded-lg">
-                  <pre className="text-sm"><code>{`-- Blocking index creation
+                <CodeBlock
+                  variant="fancy"
+                  language="sql"
+                  code={`-- Blocking index creation
 CREATE INDEX idx_user_email 
 ON users (email);
 
 -- No transaction safety
 ALTER TABLE users 
-ADD COLUMN status VARCHAR(50);`}</code></pre>
-                </div>
+ADD COLUMN status VARCHAR(50);`}
+                />
               </div>
               
               <div>
                 <h4 className="text-sm font-medium text-green-700 mb-2">✅ After Enhancement</h4>
-                <div className="bg-green-50 border border-green-200 p-4 rounded-lg">
-                  <pre className="text-sm"><code>{`-- Flow Enhancement: Transaction Wrapper
+                <CodeBlock
+                  variant="fancy"
+                  language="sql"
+                  code={`-- Flow Enhancement: Transaction Wrapper
 BEGIN;
 
 -- Non-blocking concurrent index
@@ -244,8 +250,8 @@ ON users (email);
 ALTER TABLE users 
 ADD COLUMN status VARCHAR(50) DEFAULT 'active';
 
-COMMIT;`}</code></pre>
-                </div>
+COMMIT;`}
+                />
               </div>
             </div>
           </div>
@@ -255,19 +261,23 @@ COMMIT;`}</code></pre>
             <div className="grid md:grid-cols-2 gap-4">
               <div>
                 <h4 className="text-sm font-medium text-red-700 mb-2">❌ Before Enhancement</h4>
-                <div className="bg-red-50 border border-red-200 p-4 rounded-lg">
-                  <pre className="text-sm"><code>{`-- Dangerous operation
+                <CodeBlock
+                  variant="fancy"
+                  language="sql"
+                  code={`-- Dangerous operation
 DROP TABLE old_users;
 
 -- No backup recommendation
-TRUNCATE user_sessions;`}</code></pre>
-                </div>
+TRUNCATE user_sessions;`}
+                />
               </div>
               
               <div>
                 <h4 className="text-sm font-medium text-green-700 mb-2">✅ After Enhancement</h4>
-                <div className="bg-green-50 border border-green-200 p-4 rounded-lg">
-                  <pre className="text-sm"><code>{`-- Flow Enhancement: Backup Safety
+                <CodeBlock
+                  variant="fancy"
+                  language="sql"
+                  code={`-- Flow Enhancement: Backup Safety
 -- WARNING: Backup database before proceeding
 -- This operation cannot be undone
 
@@ -276,8 +286,8 @@ DROP TABLE IF EXISTS old_users;
 
 -- Flow Enhancement: Backup Recommendation  
 -- Create backup before truncating data
-TRUNCATE user_sessions;`}</code></pre>
-                </div>
+TRUNCATE user_sessions;`}
+                />
               </div>
             </div>
           </div>

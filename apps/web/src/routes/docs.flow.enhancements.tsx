@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
-import DocsLayout from '../components/docs/docs-layout'
+import DocsLayout from '@/components/docs/docs-layout'
+import { CodeBlock } from "@/components/ui/code-block";
 
 export const Route = createFileRoute('/docs/flow/enhancements')({
   component: RouteComponent,
@@ -7,7 +8,7 @@ export const Route = createFileRoute('/docs/flow/enhancements')({
 
 function RouteComponent() {
   return (
-    <DocsLayout title="Migration Enhancements - DriftJS Flow">
+    <DocsLayout>
       <div className="max-w-4xl mx-auto">
         {/* Header Section */}
         <div className="mb-8">
@@ -110,9 +111,11 @@ function RouteComponent() {
               <div className="grid md:grid-cols-2 gap-6">
                 <div>
                   <h4 className="font-medium text-red-600 dark:text-red-400 mb-3">❌ Before (Risky)</h4>
-                  <pre className="bg-gray-100 dark:bg-gray-800 rounded-lg p-4 text-sm overflow-x-auto">
-                    <code className="text-gray-800 dark:text-gray-200">{`ALTER TABLE users ADD COLUMN email VARCHAR(255) NOT NULL;`}</code>
-                  </pre>
+                  <CodeBlock
+                    variant="fancy"
+                    language="sql"
+                    code={`ALTER TABLE users ADD COLUMN email VARCHAR(255) NOT NULL;`}
+                  />
                   <p className="text-sm text-red-600 dark:text-red-400 mt-2">
                     ⚠️ Fails if table has existing rows without email values
                   </p>
@@ -120,16 +123,18 @@ function RouteComponent() {
                 
                 <div>
                   <h4 className="font-medium text-green-600 dark:text-green-400 mb-3">✅ After (Safe)</h4>
-                  <pre className="bg-gray-100 dark:bg-gray-800 rounded-lg p-4 text-sm overflow-x-auto">
-                    <code className="text-gray-800 dark:text-gray-200">{`-- Step 1: Add nullable column
+                  <CodeBlock
+                    variant="fancy"
+                    language="sql"
+                    code={`-- Step 1: Add nullable column
 ALTER TABLE users ADD COLUMN email VARCHAR(255);
 
 -- Step 2: Populate with defaults  
 UPDATE users SET email = 'pending@example.com' WHERE email IS NULL;
 
 -- Step 3: Apply NOT NULL constraint
-ALTER TABLE users ALTER COLUMN email SET NOT NULL;`}</code>
-                  </pre>
+ALTER TABLE users ALTER COLUMN email SET NOT NULL;`}
+                  />
                   <p className="text-sm text-green-600 dark:text-green-400 mt-2">
                     ✅ Safe multi-step approach prevents failures
                   </p>
@@ -150,10 +155,12 @@ ALTER TABLE users ALTER COLUMN email SET NOT NULL;`}</code>
               <div className="grid md:grid-cols-2 gap-6">
                 <div>
                   <h4 className="font-medium text-red-600 dark:text-red-400 mb-3">❌ Before (Long Lock)</h4>
-                  <pre className="bg-gray-100 dark:bg-gray-800 rounded-lg p-4 text-sm overflow-x-auto">
-                    <code className="text-gray-800 dark:text-gray-200">{`ALTER TABLE orders ADD CONSTRAINT fk_customer 
-FOREIGN KEY (customer_id) REFERENCES customers(id);`}</code>
-                  </pre>
+                  <CodeBlock
+                    variant="fancy"
+                    language="sql"
+                    code={`ALTER TABLE orders ADD CONSTRAINT fk_customer 
+FOREIGN KEY (customer_id) REFERENCES customers(id);`}
+                  />
                   <p className="text-sm text-red-600 dark:text-red-400 mt-2">
                     ⚠️ Long lock while validating all existing data
                   </p>
@@ -161,14 +168,16 @@ FOREIGN KEY (customer_id) REFERENCES customers(id);`}</code>
                 
                 <div>
                   <h4 className="font-medium text-green-600 dark:text-green-400 mb-3">✅ After (Minimal Lock)</h4>
-                  <pre className="bg-gray-100 dark:bg-gray-800 rounded-lg p-4 text-sm overflow-x-auto">
-                    <code className="text-gray-800 dark:text-gray-200">{`-- Step 1: Add constraint without validation (fast)
+                  <CodeBlock
+                    variant="fancy"
+                    language="sql"
+                    code={`-- Step 1: Add constraint without validation (fast)
 ALTER TABLE orders ADD CONSTRAINT fk_customer 
 FOREIGN KEY (customer_id) REFERENCES customers(id) NOT VALID;
 
 -- Step 2: Validate in separate transaction
-ALTER TABLE orders VALIDATE CONSTRAINT fk_customer;`}</code>
-                  </pre>
+ALTER TABLE orders VALIDATE CONSTRAINT fk_customer;`}
+                  />
                   <p className="text-sm text-green-600 dark:text-green-400 mt-2">
                     ✅ Minimal lock time with separate validation
                   </p>
@@ -192,13 +201,15 @@ ALTER TABLE orders VALIDATE CONSTRAINT fk_customer;`}</code>
               <p className="text-gray-600 dark:text-gray-300 mb-4">
                 Creates indexes without blocking table writes, essential for zero-downtime deployments.
               </p>
-              <pre className="bg-gray-100 dark:bg-gray-800 rounded-lg p-4 text-sm overflow-x-auto">
-                <code className="text-gray-800 dark:text-gray-200">{`-- Flow Enhancement: Non-blocking index creation
+              <CodeBlock
+                variant="fancy"
+                language="sql"
+                code={`-- Flow Enhancement: Non-blocking index creation
 CREATE INDEX CONCURRENTLY idx_users_email ON users (email);
 
 -- Automatically adds analysis after creation
-ANALYZE users;`}</code>
-              </pre>
+ANALYZE users;`}
+              />
             </div>
 
             <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-6">

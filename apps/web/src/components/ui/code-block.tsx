@@ -14,6 +14,7 @@ interface CodeBlockProps {
 	title?: string;
 	showCopy?: boolean;
 	className?: string;
+	variant?: "default" | "fancy";
 }
 
 const brandBlue = "#3b82f6"; // tailwind sky-500 – Drift signature
@@ -58,6 +59,7 @@ export function CodeBlock({
 	title,
 	showCopy = true,
 	className,
+	variant = "default",
 }: CodeBlockProps) {
 	const [copied, setCopied] = useState(false);
 
@@ -70,6 +72,43 @@ export function CodeBlock({
 			console.error("Failed to copy text: ", err);
 		}
 	};
+
+	if (variant === "fancy") {
+		return (
+			<div
+				className={cn(
+					"bg-gray-900 text-green-400 p-4 rounded-lg font-mono text-sm mb-4",
+					className,
+				)}
+			>
+				{code.split("\n").map((line, i) => {
+					if (line.trim().startsWith("#")) {
+						return (
+							<span key={i} className="text-gray-500">
+								{line}
+								<br />
+							</span>
+						);
+					}
+					if (line.trim().startsWith("$")) {
+						return (
+							<span key={i}>
+								<span className="text-yellow-400">{line.split(" ")[0]}</span>{" "}
+								{line.slice(line.indexOf(" ") + 1)}
+								<br />
+							</span>
+						);
+					}
+					return (
+						<span key={i}>
+							{line}
+							<br />
+						</span>
+					);
+				})}
+			</div>
+		);
+	}
 
 	return (
 		<div

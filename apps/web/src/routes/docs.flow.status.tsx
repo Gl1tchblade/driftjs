@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import DocsLayout from "@/components/docs/docs-layout";
+import { CodeBlock } from "@/components/ui/code-block";
 
 export const Route = createFileRoute("/docs/flow/status")({
   component: RouteComponent,
@@ -15,15 +16,14 @@ function RouteComponent() {
         </p>
 
         <h2>Quick Start</h2>
-        <pre>
-          <code>
-{`# Show status of migrations
-flow status
+        <CodeBlock
+          variant="fancy"
+          code={`# Show status of migrations
+$ flow status
 
 # Show status for a specific project
-flow status --project ./backend`}
-          </code>
-        </pre>
+$ flow status --project ./backend`}
+        />
 
         <h2>Overview</h2>
         <p>

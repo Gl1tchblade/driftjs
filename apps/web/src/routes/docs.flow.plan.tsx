@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import DocsLayout from '@/components/docs/docs-layout'
+import { CodeBlock } from '@/components/ui/code-block'
 
 export const Route = createFileRoute('/docs/flow/plan')({
   component: RouteComponent,
@@ -15,18 +16,17 @@ function RouteComponent() {
         </p>
 
         <h2>Quick Start</h2>
-        <pre>
-          <code>
-{`# Preview enhancements for latest migration
-flow plan
+        <CodeBlock
+          variant="fancy"
+          code={`# Preview enhancements for latest migration
+$ flow plan
 
 # Preview enhancements for specific file
-flow plan migrations/20240101000001_add_users.sql
+$ flow plan migrations/20240101000001_add_users.sql
 
 # Generate plan for specific project
-flow plan --project ./backend`}
-          </code>
-        </pre>
+$ flow plan --project ./backend`}
+        />
 
         <h2>Overview</h2>
         <p>
@@ -61,9 +61,10 @@ flow plan --project ./backend`}
         <p>
           You can use <code>flow plan</code> in your CI/CD pipeline to automatically comment on pull requests with a summary of proposed changes.
         </p>
-        <pre>
-          <code>
-{`# GitHub Actions: Comment PR with Enhancement Plan
+        <CodeBlock
+          variant="fancy"
+          language="yaml"
+          code={String.raw`# GitHub Actions: Comment PR with Enhancement Plan
 - name: Generate Enhancement Plan
   run: flow plan --format markdown > enhancement-plan.md
 - name: Comment PR with Plan
@@ -76,10 +77,11 @@ flow plan --project ./backend`}
         issue_number: context.issue.number,
         owner: context.repo.owner,
         repo: context.repo.repo,
-        body: \`## 🚀 Flow Enhancement Plan\n\n\${plan}\`
+        body: \`## 🚀 Flow Enhancement Plan
+
+\${plan}\`
       });`}
-          </code>
-        </pre>
+        />
       </div>
     </DocsLayout>
   )

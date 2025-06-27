@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import DocsLayout from "@/components/docs/docs-layout"
+import { CodeBlock } from "@/components/ui/code-block";
 
 export const Route = createFileRoute("/docs/flow/validate")({
   component: RouteComponent,
@@ -15,18 +16,17 @@ function RouteComponent() {
         </p>
 
         <h2>Quick Start</h2>
-        <pre>
-          <code>
-{`# Validate latest migration automatically
-flow validate
+        <CodeBlock
+          variant="fancy"
+          code={`# Validate latest migration automatically
+$ flow validate
 
 # Validate specific migration file  
-flow validate migrations/20240101000001_add_users.sql
+$ flow validate migrations/20240101000001_add_users.sql
 
 # Validate in specific project directory
-flow validate --project ./backend`}
-          </code>
-        </pre>
+$ flow validate --project ./backend`}
+        />
 
         <h2>Overview</h2>
         <p>
@@ -80,9 +80,10 @@ flow validate --project ./backend`}
         </table>
 
         <h2>Integration Example (CI/CD)</h2>
-        <pre>
-          <code>
-{`# GitHub Actions Workflow
+        <CodeBlock
+          variant="fancy"
+          language="yaml"
+          code={`# GitHub Actions Workflow
 name: Validate Migrations
 on: [push, pull_request]
 
@@ -95,8 +96,7 @@ jobs:
         run: npm install -g @driftjs/flow
       - name: Validate Migrations
         run: flow validate --all`}
-          </code>
-        </pre>
+        />
       </div>
     </DocsLayout>
   );
