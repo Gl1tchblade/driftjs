@@ -1,23 +1,29 @@
 import { createFileRoute } from '@tanstack/react-router'
-import DocsLayout from '@/components/docs/docs-layout'
 import { CodeBlock } from '@/components/ui/code-block'
 
 export const Route = createFileRoute('/docs/flow/rollback')({
-  component: RouteComponent,
+  component: FlowRollbackDoc,
 })
 
-function RouteComponent() {
+function FlowRollbackDoc() {
   return (
-    <DocsLayout>
-      <div className="prose prose-gray dark:prose-invert max-w-none">
-        <h1>↩️ flow rollback</h1>
-        <p className="lead">
-          Generate a rollback script to undo a migration. This is a critical safety feature for recovering from failed deployments.
+    <div className="prose prose-lg max-w-4xl mx-auto p-6">
+      {/* Header */}
+      <div className="not-prose mb-8">
+        <h1 className="text-4xl font-bold bg-gradient-to-r from-rose-500 to-orange-400 bg-clip-text text-transparent">
+          ↩️ flow rollback
+        </h1>
+        <p className="text-xl text-gray-600 dark:text-zinc-300 mt-2">
+          Generate a rollback script to undo a migration. A critical safety feature for recovering
+          quickly from failed deployments.
         </p>
+      </div>
 
-        <h2>Quick Start</h2>
+      {/* Quick Start */}
+      <section className="mb-8">
+        <h2 className="text-2xl font-semibold mb-4">Quick Start</h2>
         <CodeBlock
-          variant="fancy"
+          variant="default"
           code={`# Generate rollback for the latest migration
 $ flow rollback
 
@@ -27,23 +33,49 @@ $ flow rollback migrations/20240101000001_add_users.sql
 # Output rollback script to a file
 $ flow rollback > rollback_script.sql`}
         />
+      </section>
 
-        <h2>Overview</h2>
+      {/* Overview */}
+      <section className="mb-8">
+        <h2 className="text-2xl font-semibold mb-4">Overview</h2>
         <p>
-          The <code>flow rollback</code> command analyzes a migration and generates the corresponding SQL to reverse its operations. It intelligently inverts common DDL statements.
+          The <code>flow rollback</code> command analyzes a migration and generates the corresponding SQL
+          to reverse its operations. It intelligently inverts common DDL statements and respects
+          dependencies between objects.
         </p>
+      </section>
 
-        <h2>How It Works</h2>
-        <p>
-          Flow parses the migration file and maps each SQL operation to its inverse:
-        </p>
-        <ul>
-          <li><code>CREATE TABLE</code> ↔️ <code>DROP TABLE</code></li>
-          <li><code>ADD COLUMN</code> ↔️ <code>DROP COLUMN</code></li>
-          <li><code>CREATE INDEX</code> ↔️ <code>DROP INDEX</code></li>
+      {/* How It Works */}
+      <section className="mb-8">
+        <h2 className="text-2xl font-semibold mb-4">How It Works</h2>
+
+        <div className="callout callout-green">
+          <p className="m-0 text-sm">
+            Flow always verifies that a rollback is <em>safe to run</em> and warns if destructive steps
+            cannot be reversed reliably.
+          </p>
+        </div>
+
+        <ul className="list-disc list-inside space-y-1">
+          <li>
+            <code>CREATE TABLE</code> ↔️ <code>DROP TABLE</code>
+          </li>
+          <li>
+            <code>ADD COLUMN</code> ↔️ <code>DROP COLUMN</code>
+          </li>
+          <li>
+            <code>CREATE INDEX</code> ↔️ <code>DROP INDEX</code>
+          </li>
+          <li>
+            <code>UPDATE</code>/<code>DELETE</code> statements are wrapped in compensating statements where
+            possible
+          </li>
         </ul>
+      </section>
 
-        <h2>Command Options</h2>
+      {/* Command Options */}
+      <section className="mb-8">
+        <h2 className="text-2xl font-semibold mb-4">Command Options</h2>
         <table>
           <thead>
             <tr>
@@ -62,8 +94,11 @@ $ flow rollback > rollback_script.sql`}
             </tr>
           </tbody>
         </table>
+      </section>
 
-        <h2>Example</h2>
+      {/* Example */}
+      <section className="mb-8">
+        <h2 className="text-2xl font-semibold mb-4">Example</h2>
         <p><strong>Given Migration:</strong></p>
         <CodeBlock
           variant="fancy"
@@ -71,7 +106,6 @@ $ flow rollback > rollback_script.sql`}
 ALTER TABLE users ADD COLUMN age INT;
 CREATE INDEX idx_email ON users(email);`}
         />
-
         <p><strong>Generated Rollback Script:</strong></p>
         <CodeBlock
           variant="fancy"
@@ -80,7 +114,29 @@ DROP INDEX idx_email;
 ALTER TABLE users DROP COLUMN age;
 DROP TABLE users;`}
         />
-      </div>
-    </DocsLayout>
+      </section>
+
+      {/* Related Commands */}
+      <section>
+        <h2 className="text-2xl font-semibold mb-4">Related Commands</h2>
+        <div className="grid md:grid-cols-3 gap-4 not-prose">
+          <RelatedCard href="/docs/flow/enhance" title="🚀 flow enhance" desc="Apply safety + performance enhancements" />
+          <RelatedCard href="/docs/flow/validate" title="🔍 flow validate" desc="Validate migrations before rollback" />
+          <RelatedCard href="/docs/flow/status" title="📊 flow status" desc="Check migration status and history" />
+        </div>
+      </section>
+    </div>
+  )
+}
+
+function RelatedCard({ href, title, desc }: { href: string; title: string; desc: string }) {
+  return (
+    <a
+      href={href}
+      className="block rounded-lg border border-zinc-700/60 bg-zinc-800/40 p-4 hover:border-orange-400 hover:shadow-md transition-colors"
+    >
+      <h3 className="font-medium mb-1 text-orange-300">{title}</h3>
+      <p className="text-sm text-zinc-300">{desc}</p>
+    </a>
   )
 } 

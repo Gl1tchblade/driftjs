@@ -77,35 +77,35 @@ export function CodeBlock({
 		return (
 			<div
 				className={cn(
-					"bg-gray-900 text-green-400 p-4 rounded-lg font-mono text-sm mb-4",
+					"bg-gray-900 text-sm mb-4 rounded-lg overflow-x-auto h-full",
 					className,
 				)}
 			>
-				{code.split("\n").map((line, i) => {
-					if (line.trim().startsWith("#")) {
-						return (
-							<span key={i} className="text-gray-500">
-								{line}
-								<br />
-							</span>
-						);
-					}
-					if (line.trim().startsWith("$")) {
-						return (
-							<span key={i}>
-								<span className="text-yellow-400">{line.split(" ")[0]}</span>{" "}
-								{line.slice(line.indexOf(" ") + 1)}
-								<br />
-							</span>
-						);
-					}
-					return (
-						<span key={i}>
-							{line}
-							<br />
-						</span>
-					);
-				})}
+				<SyntaxHighlighter
+					language={language}
+					style={{
+						...driftOneDark,
+						'pre[class*="language-"]': {
+							...oneDark['pre[class*="language-"]'],
+							background: "transparent",
+							margin: 0,
+							padding: "1rem",
+						},
+						'code[class*="language-"]': {
+							...oneDark['code[class*="language-"]'],
+							background: "transparent",
+						},
+					}}
+					customStyle={{
+						background: "transparent",
+						fontSize: "14px",
+						lineHeight: "1.5",
+					}}
+					wrapLines
+					showLineNumbers={false}
+				>
+					{code}
+				</SyntaxHighlighter>
 			</div>
 		);
 	}
@@ -113,7 +113,7 @@ export function CodeBlock({
 	return (
 		<div
 			className={cn(
-				"relative my-6 rounded-lg border border-zinc-800 bg-zinc-950/70 shadow-sm",
+				"relative my-6 h-full rounded-lg border border-zinc-800 bg-zinc-950/70 shadow-sm",
 				className,
 			)}
 		>

@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { CodeBlock } from '@/components/ui/code-block'
 
-export const Route = createFileRoute('/docs/flow/commands' as any)({
+export const Route = createFileRoute('/docs/flow/commands')({
   component: FlowCommandsDoc,
 })
 
@@ -32,7 +32,7 @@ function FlowCommandsDoc() {
             </p>
             
             <CodeBlock
-              variant="fancy"
+              variant="default"
               code={`# Enhance latest migration automatically
 $ flow enhance
 
@@ -84,7 +84,7 @@ $ flow enhance --verbose`}
             </p>
             
             <CodeBlock
-              variant="fancy"
+              variant="default"
               code={`# Validate latest migration
 $ flow validate
 
@@ -109,7 +109,7 @@ $ flow validate --strict`}
             </p>
             
             <CodeBlock
-              variant="fancy"
+              variant="default"
               code={`# Plan enhancements for latest migration
 $ flow plan
 
@@ -134,7 +134,7 @@ $ flow plan --output plan.json`}
             </p>
             
             <CodeBlock
-              variant="fancy"
+              variant="default"
               code={`# Rollback latest migration
 $ flow rollback
 
@@ -166,7 +166,7 @@ $ flow rollback --force`}
             </p>
             
             <CodeBlock
-              variant="fancy"
+              variant="default"
               code={`# Initialize Flow in current directory
 $ flow init
 
@@ -191,7 +191,7 @@ $ flow init --no-detect`}
             </p>
             
             <CodeBlock
-              variant="fancy"
+              variant="default"
               code={`# View current configuration
 $ flow config show
 
@@ -219,7 +219,7 @@ $ flow config reset`}
             </p>
             
             <CodeBlock
-              variant="fancy"
+              variant="default"
               code={`# Show overall project status
 $ flow status
 

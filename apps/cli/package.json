@@ -1,6 +1,6 @@
 {
   "name": "@driftjs/flow",
-  "version": "1.2.2",
+  "version": "1.2.3",
   "description": "Production-ready CLI that automatically enhances database migrations with 50+ safety, performance, and monitoring improvements. Supports Prisma, Drizzle, TypeORM with zero-downtime deployments and comprehensive rollback capabilities.",
   "main": "dist/index.js",
   "type": "module",

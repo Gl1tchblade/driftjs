@@ -380,3 +380,48 @@ body {
 	-webkit-background-clip: text;
 	-webkit-text-fill-color: transparent;
 }
+
+/* ------------------------------------------------------------------
+   Docs Table & Callout Styling Overrides (Dark Mode Friendly)
+   ------------------------------------------------------------------ */
+@layer components {
+	/* Generic table reset for Markdown/prose tables */
+	.prose table {
+		@apply w-full border-collapse rounded-md overflow-hidden text-left text-sm;
+	}
+	.prose thead {
+		@apply bg-gray-100 dark:bg-zinc-800/70;
+	}
+	.prose thead th {
+		@apply px-4 py-3 font-semibold tracking-wide text-gray-700 dark:text-zinc-200;
+	}
+	.prose tbody tr {
+		@apply border-t border-gray-200 dark:border-zinc-700/60;
+	}
+	.prose tbody tr:nth-child(odd) {
+		@apply bg-white/60 dark:bg-zinc-900/40;
+	}
+	.prose tbody tr:nth-child(even) {
+		@apply bg-gray-50/60 dark:bg-zinc-800/40;
+	}
+	.prose tbody td {
+		@apply px-4 py-2 text-gray-800 dark:text-zinc-200 font-medium align-top;
+	}
+
+	/* Utility callout boxes — add class names like `callout-blue`, `callout-green`, etc. */
+	.callout {
+		@apply rounded-lg border-l-4 p-4 my-4;
+	}
+	.callout-blue {
+		@apply border-blue-500 bg-blue-50 text-blue-800 dark:bg-blue-900/20 dark:text-blue-200;
+	}
+	.callout-green {
+		@apply border-green-500 bg-green-50 text-green-800 dark:bg-green-900/20 dark:text-green-200;
+	}
+	.callout-yellow {
+		@apply border-yellow-500 bg-yellow-50 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-200;
+	}
+	.callout-red {
+		@apply border-red-500 bg-red-50 text-red-800 dark:bg-red-900/20 dark:text-red-200;
+	}
+}

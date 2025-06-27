@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { CodeBlock } from '../../../components/ui/code-block'
+import { CodeBlock } from '@/components/ui/code-block'
 
-export const Route = createFileRoute('/docs/flow/examples' as any)({
+export const Route = createFileRoute('/docs/flow/examples')({
   component: FlowExamplesDoc,
 })
 

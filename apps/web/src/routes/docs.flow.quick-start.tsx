@@ -6,42 +6,97 @@ function FlowQuickStartPage() {
     <section className="mx-auto max-w-3xl px-4 py-8">
       <h1 className="mb-4 text-4xl font-semibold lowercase">quick start</h1>
       <p className="text-muted-foreground mb-8">
-        A minimal walkthrough that gets you from zero to your first flow migration in
-        under two minutes.
+        Follow these steps to go from zero to <code>flow enhance</code> in less than two minutes.
       </p>
 
       <div className="space-y-10">
-        {/* 1. Initialise project */}
+        {/* 1. Install CLI globally */}
         <div>
-          <h2 className="mb-2 text-xl font-medium lowercase">1. initialise</h2>
+          <h2 className="mb-2 text-xl font-medium lowercase">1. install</h2>
           <p className="mb-4 text-muted-foreground">
-            Create the <code>migrations/</code> folder and a config file.
-          </p>
-          <CodeBlock variant="fancy" language="bash" code={`$ flow init`} />
-        </div>
-
-        {/* 2. Generate migration */}
-        <div>
-          <h2 className="mb-2 text-xl font-medium lowercase">2. generate</h2>
-          <p className="mb-4 text-muted-foreground">
-            Generate a timestamped migration by passing raw SQL or letting Flow
-            diff your database schema.
+            Install the Flow binary globally using your favourite package manager.
           </p>
           <CodeBlock
-            variant="fancy"
+            variant="default"
             language="bash"
-            code={`$ flow generate "ALTER TABLE users ADD COLUMN bio text;"`}
+            code={`npm install -g @driftjs/flow  # or: bun add -g @driftjs/flow`}
           />
         </div>
 
-        {/* 3. Apply migration */}
+        {/* 2. Initialize project */}
         <div>
-          <h2 className="mb-2 text-xl font-medium lowercase">3. apply</h2>
+          <h2 className="mb-2 text-xl font-medium lowercase">2. init</h2>
           <p className="mb-4 text-muted-foreground">
-            Apply pending migrations. Flow performs safety analysis and runs the
-            changes online with zero downtime.
+            Bootstrap your project: creates <code>flow.config.json</code> and <code>migrations/</code>.
           </p>
-          <CodeBlock variant="fancy" language="bash" code={`$ flow apply`} />
+          <CodeBlock variant="default" language="bash" code={`flow init`} />
+        </div>
+
+        {/* 3. Add a migration */}
+        <div>
+          <h2 className="mb-2 text-xl font-medium lowercase">3. add migration</h2>
+          <p className="mb-4 text-muted-foreground">
+            Create a timestamped SQL file inside <code>migrations/</code>. Follow the
+            <code>YYYYMMDDHHMMSS_description.sql</code> naming convention.
+          </p>
+          <CodeBlock
+            variant="default"
+            language="bash"
+            code={`# add a timestamped SQL file (any editor)
+$ touch migrations/$(date +%Y%m%d%H%M%S)_add_users.sql`} />
+
+          {/* Prisma workflow */}
+          <div className="callout callout-blue mt-6">
+            <p className="m-0 text-sm">
+              Using <strong>Prisma</strong>? Let it create the migration, then enhance:
+            </p>
+            <CodeBlock
+              variant="fancy"
+              language="bash"
+              code={`# 1. Create a Prisma migration (SQL only)
+$ npx prisma migrate dev --create-only --name add_users
+
+# 2. Enhance & run it with Flow
+$ flow plan prisma/migrations/*/migration.sql   # preview
+$ flow enhance prisma/migrations/*/migration.sql # add safety & speed tweaks
+$ flow apply`} />
+          </div>
+
+          {/* Now add Drizzle callout under Prisma */}
+          <div className="callout callout-green mt-6">
+            <p className="m-0 text-sm">
+              Using <strong>Drizzle ORM</strong>? Generate the SQL migration, then enhance:
+            </p>
+            <CodeBlock
+              variant="fancy"
+              language="bash"
+              code={`# 1. Generate SQL migration
+$ drizzle-kit generate:pg
+
+# 2. Enhance and run with Flow
+$ flow plan drizzle/migrations/*/*.sql   # preview
+$ flow enhance drizzle/migrations/*/*.sql # safety & speed tweaks
+$ flow apply`} />
+          </div>
+        </div>
+
+        {/* 4. Enhance & apply */}
+        <div>
+          <h2 className="mb-2 text-xl font-medium lowercase">4. enhance & apply</h2>
+          <p className="mb-4 text-muted-foreground">
+            Preview changes first, then apply with zero downtime.
+          </p>
+          <CodeBlock
+            variant="default"
+            language="bash"
+            code={`# 1. Preview enhancements (safe, no files modified)
+$ flow plan                           
+
+# 2. Apply safety & performance tweaks to the migration file
+$ flow enhance                        
+
+# 3. Execute the enhanced migration against the database
+$ flow apply`} />
         </div>
       </div>
     </section>

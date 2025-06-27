@@ -21,9 +21,6 @@ const flowNav: NavGroup[] = [
     label: "features",
     children: [
       { label: "enhancements", href: "/docs/flow/enhancements" },
-      { label: "safety patterns", href: "/docs/flow/safety" },
-      { label: "performance", href: "/docs/flow/performance" },
-      { label: "monitoring", href: "/docs/flow/monitoring" },
     ],
   },
   {
@@ -36,7 +33,6 @@ const flowNav: NavGroup[] = [
       { label: "rollback", href: "/docs/flow/rollback" },
       { label: "status", href: "/docs/flow/status" },
       { label: "config", href: "/docs/flow/config" },
-      { label: "ci/cd", href: "/docs/flow/ci" },
     ],
   },
 ];
@@ -48,7 +44,7 @@ export default function DocsSidebar() {
   const navItems = pathname.startsWith("/docs/flow") ? flowNav : [];
 
   return (
-    <aside className="flex w-64 shrink-0 flex-col border-r border-border/40 bg-background/90 px-4 py-8">
+    <aside className="sticky top-0 flex h-screen w-64 shrink-0 flex-col overflow-y-auto border-r border-border/40 bg-background/90 px-4 py-8">
       {/* Brand */}
       <Link
         to={"/" as any}

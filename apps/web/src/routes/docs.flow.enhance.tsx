@@ -22,7 +22,7 @@ function FlowEnhanceDoc() {
         <h2 className="text-2xl font-semibold mb-4">Quick Start</h2>
         
         <CodeBlock
-          variant="fancy"
+          variant="default"
           code={`# Enhance latest migration automatically
 $ flow enhance
 
@@ -39,7 +39,7 @@ $ flow enhance --dry-run`}
         <h2 className="text-2xl font-semibold mb-4">Two-Phase Enhancement Process</h2>
         
         <div className="grid md:grid-cols-2 gap-6">
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <div className="callout callout-red">
             <h3 className="text-lg font-semibold text-red-800 mb-2">🛡️ Phase 1: Safety</h3>
             <ul className="text-sm text-red-700 space-y-1">
               <li>• Transaction Wrapper</li>
@@ -51,7 +51,7 @@ $ flow enhance --dry-run`}
             </ul>
           </div>
 
-          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+          <div className="callout callout-green">
             <h3 className="text-lg font-semibold text-green-800 mb-2">⚡ Phase 2: Speed</h3>
             <ul className="text-sm text-green-700 space-y-1">
               <li>• Smart Index Analysis</li>
@@ -104,7 +104,7 @@ $ flow enhance --dry-run`}
           and applies intelligent safety and performance enhancements through an interactive two-phase process.
         </p>
         
-        <div className="bg-blue-50 border-l-4 border-blue-400 p-4 my-4">
+        <div className="callout callout-blue">
           <div className="flex">
             <div className="ml-3">
               <p className="text-sm text-blue-700">
@@ -121,34 +121,34 @@ $ flow enhance --dry-run`}
         <h2 className="text-2xl font-semibold mb-4">Command Options</h2>
         
         <div className="overflow-x-auto">
-          <table className="min-w-full bg-white border border-gray-200">
-            <thead className="bg-gray-50">
+          <table>
+            <thead>
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Option</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Example</th>
+                <th>Option</th>
+                <th>Description</th>
+                <th>Example</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200">
+            <tbody>
               <tr>
-                <td className="px-6 py-4 text-sm font-mono bg-gray-50">[file]</td>
-                <td className="px-6 py-4 text-sm text-gray-900">Path to migration file (optional)</td>
-                <td className="px-6 py-4 text-sm font-mono">migrations/add_index.sql</td>
+                <td><code>[file]</code></td>
+                <td>Path to migration file (optional)</td>
+                <td><code>migrations/add_index.sql</code></td>
               </tr>
               <tr>
-                <td className="px-6 py-4 text-sm font-mono bg-gray-50">--project, -p</td>
-                <td className="px-6 py-4 text-sm text-gray-900">Specify project directory</td>
-                <td className="px-6 py-4 text-sm font-mono">./backend</td>
+                <td><code>--project, -p</code></td>
+                <td>Specify project directory</td>
+                <td><code>./backend</code></td>
               </tr>
               <tr>
-                <td className="px-6 py-4 text-sm font-mono bg-gray-50">--dry-run</td>
-                <td className="px-6 py-4 text-sm text-gray-900">Preview changes without applying</td>
-                <td className="px-6 py-4 text-sm font-mono">--dry-run</td>
+                <td><code>--dry-run</code></td>
+                <td>Preview changes without applying</td>
+                <td><code>--dry-run</code></td>
               </tr>
               <tr>
-                <td className="px-6 py-4 text-sm font-mono bg-gray-50">--verbose, -v</td>
-                <td className="px-6 py-4 text-sm text-gray-900">Enable detailed logging</td>
-                <td className="px-6 py-4 text-sm font-mono">-v</td>
+                <td><code>--verbose, -v</code></td>
+                <td>Enable detailed logging</td>
+                <td><code>-v</code></td>
               </tr>
             </tbody>
           </table>
@@ -222,7 +222,7 @@ $ flow enhance --dry-run`}
               <div>
                 <h4 className="text-sm font-medium text-red-700 mb-2">❌ Before Enhancement</h4>
                 <CodeBlock
-                  variant="fancy"
+                  variant="default"
                   language="sql"
                   code={`-- Blocking index creation
 CREATE INDEX idx_user_email 
@@ -237,7 +237,7 @@ ADD COLUMN status VARCHAR(50);`}
               <div>
                 <h4 className="text-sm font-medium text-green-700 mb-2">✅ After Enhancement</h4>
                 <CodeBlock
-                  variant="fancy"
+                  variant="default"
                   language="sql"
                   code={`-- Flow Enhancement: Transaction Wrapper
 BEGIN;
@@ -262,7 +262,7 @@ COMMIT;`}
               <div>
                 <h4 className="text-sm font-medium text-red-700 mb-2">❌ Before Enhancement</h4>
                 <CodeBlock
-                  variant="fancy"
+                  variant="default"
                   language="sql"
                   code={`-- Dangerous operation
 DROP TABLE old_users;
@@ -275,7 +275,7 @@ TRUNCATE user_sessions;`}
               <div>
                 <h4 className="text-sm font-medium text-green-700 mb-2">✅ After Enhancement</h4>
                 <CodeBlock
-                  variant="fancy"
+                  variant="default"
                   language="sql"
                   code={`-- Flow Enhancement: Backup Safety
 -- WARNING: Backup database before proceeding
@@ -351,7 +351,7 @@ TRUNCATE user_sessions;`}
         <h2 className="text-2xl font-semibold mb-4">Best Practices</h2>
         
         <div className="space-y-4">
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="callout callout-blue">
             <h3 className="font-medium text-blue-800 mb-2">🔄 Development Workflow</h3>
             <ol className="text-sm text-blue-700 space-y-1 list-decimal list-inside">
               <li>Write your migration file</li>
@@ -363,7 +363,7 @@ TRUNCATE user_sessions;`}
             </ol>
           </div>
 
-          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+          <div className="callout callout-green">
             <h3 className="font-medium text-green-800 mb-2">✅ Safety Guidelines</h3>
             <ul className="text-sm text-green-700 space-y-1 list-disc list-inside">
               <li>Always create database backups before destructive operations</li>
@@ -374,7 +374,7 @@ TRUNCATE user_sessions;`}
             </ul>
           </div>
 
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+          <div className="callout callout-yellow">
             <h3 className="font-medium text-yellow-800 mb-2">⚡ Performance Tips</h3>
             <ul className="text-sm text-yellow-700 space-y-1 list-disc list-inside">
               <li>Let Flow's smart analysis guide index decisions</li>
@@ -392,7 +392,7 @@ TRUNCATE user_sessions;`}
         <h2 className="text-2xl font-semibold mb-4">Related Commands</h2>
         
         <div className="grid md:grid-cols-3 gap-4">
-          <div className="bg-white border border-gray-200 rounded-lg p-4">
+          <div className="callout callout-blue dark:bg-zinc-800 dark:border-zinc-700">
             <h3 className="font-medium mb-2">
               <a href="/docs/flow/validate" className="text-blue-600 hover:text-blue-800">
                 🔍 flow validate
@@ -403,7 +403,7 @@ TRUNCATE user_sessions;`}
             </p>
           </div>
 
-          <div className="bg-white border border-gray-200 rounded-lg p-4">
+          <div className="callout callout-blue dark:bg-zinc-800 dark:border-zinc-700">
             <h3 className="font-medium mb-2">
               <a href="/docs/flow/plan" className="text-blue-600 hover:text-blue-800">
                 📋 flow plan
@@ -414,7 +414,7 @@ TRUNCATE user_sessions;`}
             </p>
           </div>
 
-          <div className="bg-white border border-gray-200 rounded-lg p-4">
+          <div className="callout callout-blue dark:bg-zinc-800 dark:border-zinc-700">
             <h3 className="font-medium mb-2">
               <a href="/docs/flow/status" className="text-blue-600 hover:text-blue-800">
                 📊 flow status

@@ -23,9 +23,11 @@ import { Route as DocsFlowQuickStartRouteImport } from './routes/docs.flow.quick
 import { Route as DocsFlowPlanRouteImport } from './routes/docs.flow.plan'
 import { Route as DocsFlowInstallationRouteImport } from './routes/docs.flow.installation'
 import { Route as DocsFlowInitRouteImport } from './routes/docs.flow.init'
+import { Route as DocsFlowExamplesRouteImport } from './routes/docs.flow.examples'
 import { Route as DocsFlowEnhancementsRouteImport } from './routes/docs.flow.enhancements'
 import { Route as DocsFlowEnhanceRouteImport } from './routes/docs.flow.enhance'
 import { Route as DocsFlowConfigRouteImport } from './routes/docs.flow.config'
+import { Route as DocsFlowCommandsRouteImport } from './routes/docs.flow.commands'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -97,6 +99,11 @@ const DocsFlowInitRoute = DocsFlowInitRouteImport.update({
   path: '/init',
   getParentRoute: () => DocsFlowRoute,
 } as any)
+const DocsFlowExamplesRoute = DocsFlowExamplesRouteImport.update({
+  id: '/examples',
+  path: '/examples',
+  getParentRoute: () => DocsFlowRoute,
+} as any)
 const DocsFlowEnhancementsRoute = DocsFlowEnhancementsRouteImport.update({
   id: '/enhancements',
   path: '/enhancements',
@@ -112,6 +119,11 @@ const DocsFlowConfigRoute = DocsFlowConfigRouteImport.update({
   path: '/config',
   getParentRoute: () => DocsFlowRoute,
 } as any)
+const DocsFlowCommandsRoute = DocsFlowCommandsRouteImport.update({
+  id: '/commands',
+  path: '/commands',
+  getParentRoute: () => DocsFlowRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -121,9 +133,11 @@ export interface FileRoutesByFullPath {
   '/landing': typeof LandingRoute
   '/login': typeof LoginRoute
   '/docs/flow': typeof DocsFlowRouteWithChildren
+  '/docs/flow/commands': typeof DocsFlowCommandsRoute
   '/docs/flow/config': typeof DocsFlowConfigRoute
   '/docs/flow/enhance': typeof DocsFlowEnhanceRoute
   '/docs/flow/enhancements': typeof DocsFlowEnhancementsRoute
+  '/docs/flow/examples': typeof DocsFlowExamplesRoute
   '/docs/flow/init': typeof DocsFlowInitRoute
   '/docs/flow/installation': typeof DocsFlowInstallationRoute
   '/docs/flow/plan': typeof DocsFlowPlanRoute
@@ -140,9 +154,11 @@ export interface FileRoutesByTo {
   '/landing': typeof LandingRoute
   '/login': typeof LoginRoute
   '/docs/flow': typeof DocsFlowRouteWithChildren
+  '/docs/flow/commands': typeof DocsFlowCommandsRoute
   '/docs/flow/config': typeof DocsFlowConfigRoute
   '/docs/flow/enhance': typeof DocsFlowEnhanceRoute
   '/docs/flow/enhancements': typeof DocsFlowEnhancementsRoute
+  '/docs/flow/examples': typeof DocsFlowExamplesRoute
   '/docs/flow/init': typeof DocsFlowInitRoute
   '/docs/flow/installation': typeof DocsFlowInstallationRoute
   '/docs/flow/plan': typeof DocsFlowPlanRoute
@@ -160,9 +176,11 @@ export interface FileRoutesById {
   '/landing': typeof LandingRoute
   '/login': typeof LoginRoute
   '/docs/flow': typeof DocsFlowRouteWithChildren
+  '/docs/flow/commands': typeof DocsFlowCommandsRoute
   '/docs/flow/config': typeof DocsFlowConfigRoute
   '/docs/flow/enhance': typeof DocsFlowEnhanceRoute
   '/docs/flow/enhancements': typeof DocsFlowEnhancementsRoute
+  '/docs/flow/examples': typeof DocsFlowExamplesRoute
   '/docs/flow/init': typeof DocsFlowInitRoute
   '/docs/flow/installation': typeof DocsFlowInstallationRoute
   '/docs/flow/plan': typeof DocsFlowPlanRoute
@@ -181,9 +199,11 @@ export interface FileRouteTypes {
     | '/landing'
     | '/login'
     | '/docs/flow'
+    | '/docs/flow/commands'
     | '/docs/flow/config'
     | '/docs/flow/enhance'
     | '/docs/flow/enhancements'
+    | '/docs/flow/examples'
     | '/docs/flow/init'
     | '/docs/flow/installation'
     | '/docs/flow/plan'
@@ -200,9 +220,11 @@ export interface FileRouteTypes {
     | '/landing'
     | '/login'
     | '/docs/flow'
+    | '/docs/flow/commands'
     | '/docs/flow/config'
     | '/docs/flow/enhance'
     | '/docs/flow/enhancements'
+    | '/docs/flow/examples'
     | '/docs/flow/init'
     | '/docs/flow/installation'
     | '/docs/flow/plan'
@@ -219,9 +241,11 @@ export interface FileRouteTypes {
     | '/landing'
     | '/login'
     | '/docs/flow'
+    | '/docs/flow/commands'
     | '/docs/flow/config'
     | '/docs/flow/enhance'
     | '/docs/flow/enhancements'
+    | '/docs/flow/examples'
     | '/docs/flow/init'
     | '/docs/flow/installation'
     | '/docs/flow/plan'
@@ -340,6 +364,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DocsFlowInitRouteImport
       parentRoute: typeof DocsFlowRoute
     }
+    '/docs/flow/examples': {
+      id: '/docs/flow/examples'
+      path: '/examples'
+      fullPath: '/docs/flow/examples'
+      preLoaderRoute: typeof DocsFlowExamplesRouteImport
+      parentRoute: typeof DocsFlowRoute
+    }
     '/docs/flow/enhancements': {
       id: '/docs/flow/enhancements'
       path: '/enhancements'
@@ -361,13 +392,22 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DocsFlowConfigRouteImport
       parentRoute: typeof DocsFlowRoute
     }
+    '/docs/flow/commands': {
+      id: '/docs/flow/commands'
+      path: '/commands'
+      fullPath: '/docs/flow/commands'
+      preLoaderRoute: typeof DocsFlowCommandsRouteImport
+      parentRoute: typeof DocsFlowRoute
+    }
   }
 }
 
 interface DocsFlowRouteChildren {
+  DocsFlowCommandsRoute: typeof DocsFlowCommandsRoute
   DocsFlowConfigRoute: typeof DocsFlowConfigRoute
   DocsFlowEnhanceRoute: typeof DocsFlowEnhanceRoute
   DocsFlowEnhancementsRoute: typeof DocsFlowEnhancementsRoute
+  DocsFlowExamplesRoute: typeof DocsFlowExamplesRoute
   DocsFlowInitRoute: typeof DocsFlowInitRoute
   DocsFlowInstallationRoute: typeof DocsFlowInstallationRoute
   DocsFlowPlanRoute: typeof DocsFlowPlanRoute
@@ -378,9 +418,11 @@ interface DocsFlowRouteChildren {
 }
 
 const DocsFlowRouteChildren: DocsFlowRouteChildren = {
+  DocsFlowCommandsRoute: DocsFlowCommandsRoute,
   DocsFlowConfigRoute: DocsFlowConfigRoute,
   DocsFlowEnhanceRoute: DocsFlowEnhanceRoute,
   DocsFlowEnhancementsRoute: DocsFlowEnhancementsRoute,
+  DocsFlowExamplesRoute: DocsFlowExamplesRoute,
   DocsFlowInitRoute: DocsFlowInitRoute,
   DocsFlowInstallationRoute: DocsFlowInstallationRoute,
   DocsFlowPlanRoute: DocsFlowPlanRoute,
