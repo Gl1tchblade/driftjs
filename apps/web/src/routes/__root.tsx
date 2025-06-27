@@ -13,6 +13,7 @@ import { Toaster } from "@/components/ui/sonner";
 import type { trpc } from "@/utils/trpc";
 import "../index.css";
 import NotFound from "@/components/not-found";
+import { type HeadElement } from "@tanstack/react-router";
 
 export interface RouterAppContext {
 	trpc: typeof trpc;
@@ -23,9 +24,10 @@ export const Route = createRootRouteWithContext<RouterAppContext>()({
 	component: RootComponent,
 	notFoundComponent: NotFound,
 	head: function () {
-		const pathname = useRouterState({ select: (s) => s.resolvedLocation.pathname });
+		const pathname = useRouterState({ select: (s) => s.resolvedLocation.pathname || "" });
 		const canonicalUrl = `https://driftjs.com${pathname}`;
-		const siteDescription = "DriftJS builds tools developers love. From production-safe database migrations to intelligent workflow automation, we help you ship with confidence.";
+		const siteDescription =
+			"DriftJS builds tools developers love. From production-safe database migrations to intelligent workflow automation, we help you ship with confidence.";
 		const siteName = "DriftJS"; // Placeholder
 		const siteUrl = "https://driftjs.com"; // Placeholder
 		const ogImageUrl = `${siteUrl}/flow-banner.png`; // Placeholder
