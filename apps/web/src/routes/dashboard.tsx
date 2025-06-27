@@ -6,6 +6,12 @@ import { trpc } from "@/utils/trpc";
 
 export const Route = createFileRoute("/dashboard")({
 	component: RouteComponent,
+	head: () => ({
+		meta: [
+			{ title: "Dashboard — DriftJS" },
+			{ name: "robots", content: "noindex" },
+		],
+	}),
 });
 
 function RouteComponent() {

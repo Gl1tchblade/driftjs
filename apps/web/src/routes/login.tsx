@@ -5,6 +5,16 @@ import SignUpForm from "@/components/sign-up-form";
 
 export const Route = createFileRoute("/login")({
 	component: RouteComponent,
+	head: () => ({
+		meta: [
+			{ title: "Log in — DriftJS" },
+			{
+				name: "description",
+				content: "Access your DriftJS dashboard and manage your projects.",
+			},
+			{ name: "robots", content: "noindex" },
+		],
+	}),
 });
 
 function RouteComponent() {

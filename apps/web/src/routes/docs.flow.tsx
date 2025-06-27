@@ -69,4 +69,23 @@ function FlowDocsPage() {
 
 export const Route = createFileRoute("/docs/flow")({
   component: FlowDocsPage,
+  head: () => ({
+    meta: [
+      { title: "Flow Documentation — DriftJS" },
+      {
+        name: "description",
+        content: "Comprehensive documentation for Flow CLI — automate zero-downtime database migrations with DriftJS.",
+      },
+      { name: "twitter:card", content: "summary" },
+      { property: "og:title", content: "Flow Documentation — DriftJS" },
+      {
+        property: "og:description",
+        content: "Comprehensive documentation for Flow CLI — automate zero-downtime database migrations with DriftJS.",
+      },
+      { property: "og:type", content: "article" },
+    ],
+    links: [
+      { rel: "canonical", href: "https://driftjs.dev/docs/flow" },
+    ],
+  }),
 }); 

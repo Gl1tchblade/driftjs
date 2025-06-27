@@ -16,4 +16,46 @@ function HomePage() {
 
 export const Route = createFileRoute("/")({
 	component: HomePage,
+	/**
+	 * SEO / social metadata for the root page
+	 */
+	head: () => ({
+		meta: [
+			{
+				title: "DriftJS — tools developers love",
+			},
+			{
+				name: "description",
+				content:
+					"DriftJS builds open-source tooling – like Flow – that helps developers ship schema changes safely and confidently.",
+			},
+			{
+				name: "twitter:card",
+				content: "summary_large_image",
+			},
+			{
+				property: "og:title",
+				content: "DriftJS — tools developers love",
+			},
+			{
+				property: "og:description",
+				content:
+					"DriftJS builds open-source tooling – like Flow – that helps developers ship schema changes safely and confidently.",
+			},
+			{
+				property: "og:type",
+				content: "website",
+			},
+			{
+				property: "og:image",
+				content: "/logo.jpg",
+			},
+		],
+		links: [
+			{
+				rel: "canonical",
+				href: "https://driftjs.dev/",
+			},
+		],
+	}),
 });

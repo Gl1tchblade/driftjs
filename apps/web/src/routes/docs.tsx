@@ -33,4 +33,23 @@ function GeneralDocsPage() {
 
 export const Route = createFileRoute("/docs")({
   component: GeneralDocsPage,
+  head: () => ({
+    meta: [
+      { title: "Documentation — DriftJS" },
+      {
+        name: "description",
+        content: "Browse the official DriftJS guides and API references, including Flow and upcoming tools.",
+      },
+      { name: "twitter:card", content: "summary" },
+      { property: "og:title", content: "Documentation — DriftJS" },
+      {
+        property: "og:description",
+        content: "Browse the official DriftJS guides and API references, including Flow and upcoming tools.",
+      },
+      { property: "og:type", content: "article" },
+    ],
+    links: [
+      { rel: "canonical", href: "https://driftjs.dev/docs" },
+    ],
+  }),
 }); 
