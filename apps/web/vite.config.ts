@@ -3,7 +3,7 @@ import tailwindcss from "@tailwindcss/vite";
 import { TanStackRouterVite } from "@tanstack/router-plugin/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
-import viteCompression from 'vite-plugin-compression';
+import { compression as viteCompression } from 'vite-plugin-compression2';
 import Sitemap from 'vite-plugin-sitemap';
 
 export default defineConfig({
