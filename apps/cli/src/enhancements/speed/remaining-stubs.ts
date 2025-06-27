@@ -18,17 +18,19 @@ class StubApplicator implements EnhancementApplicator {
 const batchInsertEnhancement: Enhancement = { id: 'speed-batch-insert', name: 'Batch Insert', description: 'Stub', category: 'speed', priority: 5, requiresConfirmation: false, tags: ['stub'] };
 export const batchInsertModule: EnhancementModule = { enhancement: batchInsertEnhancement, detector: new StubDetector(), applicator: new StubApplicator() };
 
-// Partial Index
-const partialIndexEnhancement: Enhancement = { id: 'speed-partial-index', name: 'Partial Index', description: 'Stub', category: 'speed', priority: 5, requiresConfirmation: false, tags: ['stub'] };
+// Partial Index - DISABLED: User requested no indexing enhancements
+const partialIndexEnhancement: Enhancement = { id: 'speed-partial-index', name: 'Partial Index', description: 'DISABLED - No indexing enhancements requested', category: 'speed', priority: 0, requiresConfirmation: false, tags: ['disabled'] };
 export const partialIndexModule: EnhancementModule = { enhancement: partialIndexEnhancement, detector: new StubDetector(), applicator: new StubApplicator() };
 
-// Index Optimization
-const indexOptimizationEnhancement: Enhancement = { id: 'speed-index-optimization', name: 'Index Optimization', description: 'Stub', category: 'speed', priority: 5, requiresConfirmation: false, tags: ['stub'] };
+// Index Optimization - DISABLED: User requested no indexing enhancements  
+const indexOptimizationEnhancement: Enhancement = { id: 'speed-index-optimization', name: 'Index Optimization', description: 'DISABLED - No indexing enhancements requested', category: 'speed', priority: 0, requiresConfirmation: false, tags: ['disabled'] };
 export const indexOptimizationModule: EnhancementModule = { enhancement: indexOptimizationEnhancement, detector: new StubDetector(), applicator: new StubApplicator() };
 
-// Concurrent Index (importing from existing file)
-import { concurrentIndexModule as concurrentIndexModuleImpl } from './concurrent-index.js';
-export const concurrentIndexModule = concurrentIndexModuleImpl;
+// Concurrent Index - DISABLED: User requested no indexing enhancements
+// import { concurrentIndexModule as concurrentIndexModuleImpl } from './concurrent-index.js';
+// export const concurrentIndexModule = concurrentIndexModuleImpl;
+const concurrentIndexEnhancement: Enhancement = { id: 'speed-concurrent-index', name: 'Concurrent Index Creation', description: 'DISABLED - No indexing enhancements requested', category: 'speed', priority: 0, requiresConfirmation: false, tags: ['disabled'] };
+export const concurrentIndexModule: EnhancementModule = { enhancement: concurrentIndexEnhancement, detector: new StubDetector(), applicator: new StubApplicator() };
 
 // Query Optimization
 const queryOptimizationEnhancement: Enhancement = { id: 'speed-query-optimization', name: 'Query Optimization', description: 'Stub', category: 'speed', priority: 5, requiresConfirmation: false, tags: ['stub'] };

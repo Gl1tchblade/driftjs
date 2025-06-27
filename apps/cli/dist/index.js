@@ -1350,250 +1350,11 @@ var init_safety = __esm({
   }
 });
 
-// src/enhancements/speed/concurrent-index.ts
-import pkg from "node-sql-parser";
-async function analyzeIndexEffectiveness(indexStmt, migration) {
-  const columns = extractIndexColumns(indexStmt);
-  const tableName = extractTableName(indexStmt);
-  if (columns.some((col) => col.includes("_id") || col.includes("Id"))) {
-    return {
-      shouldIndex: true,
-      reason: "Foreign key column detected",
-      recommendation: "Use CONCURRENT option to allow non-blocking index creation",
-      priority: "high"
-    };
-  }
-  const commonQueryColumns = ["email", "username", "status", "created_at", "updated_at"];
-  if (columns.some((col) => commonQueryColumns.includes(col.toLowerCase()))) {
-    return {
-      shouldIndex: true,
-      reason: "Common query column detected",
-      recommendation: "Use CONCURRENT option to allow non-blocking index creation",
-      priority: "medium"
-    };
-  }
-  if (indexStmt.unique || migration.up.toLowerCase().includes("unique index")) {
-    return {
-      shouldIndex: true,
-      reason: "Unique constraint index",
-      recommendation: "Use CONCURRENT option to allow non-blocking index creation",
-      priority: "high"
-    };
-  }
-  if (columns.length > 3) {
-    return {
-      shouldIndex: false,
-      reason: "Complex composite index may not be efficient",
-      recommendation: "Review if all columns are needed, consider separate indexes",
-      priority: "low"
-    };
-  }
-  if (columns.some((col) => col.toLowerCase().includes("text") || col.toLowerCase().includes("description"))) {
-    return {
-      shouldIndex: false,
-      reason: "Text/blob columns are not efficient for regular indexing",
-      recommendation: "Consider partial index or full-text search instead",
-      priority: "medium"
-    };
-  }
-  return {
-    shouldIndex: true,
-    reason: "Standard index",
-    recommendation: "Use CONCURRENT option to allow non-blocking index creation",
-    priority: "low"
-  };
-}
-function extractIndexColumns(indexStmt) {
-  if (!indexStmt.on) return [];
-  try {
-    if (Array.isArray(indexStmt.on)) {
-      return indexStmt.on.map((col) => col.column || col.name || String(col));
-    }
-    if (indexStmt.on.column) {
-      return [indexStmt.on.column];
-    }
-    return [];
-  } catch (error) {
-    return [];
-  }
-}
-function extractTableName(indexStmt) {
-  try {
-    return indexStmt.table?.table || indexStmt.table?.name || "unknown_table";
-  } catch (error) {
-    return "unknown_table";
-  }
-}
-var Parser, enhancement13, concurrentIndexDetector, concurrentIndexApplicator, concurrentIndexModule;
-var init_concurrent_index = __esm({
-  "src/enhancements/speed/concurrent-index.ts"() {
-    "use strict";
-    ({ Parser } = pkg);
-    enhancement13 = {
-      id: "speed-concurrent-index",
-      name: "Concurrent Index Creation",
-      description: "Modifies CREATE INDEX operations to use CONCURRENT option, allowing index creation without blocking reads/writes",
-      category: "speed",
-      priority: 8,
-      requiresConfirmation: false,
-      tags: ["index", "concurrent", "performance", "non-blocking"]
-    };
-    concurrentIndexDetector = {
-      async detect(migration) {
-        const parser = new Parser();
-        try {
-          const ast = parser.astify(migration.up, { database: "postgresql" });
-          const statements = Array.isArray(ast) ? ast : [ast];
-          return statements.some(
-            (stmt) => stmt.type === "create" && stmt.keyword === "index" && !migration.up.toLowerCase().includes("concurrently")
-            // Only if not already concurrent
-          );
-        } catch (error) {
-          return /create\s+index/i.test(migration.up) && !/create\s+index\s+concurrently/i.test(migration.up);
-        }
-      },
-      async analyze(migration) {
-        const parser = new Parser();
-        const issues = [];
-        try {
-          const ast = parser.astify(migration.up, { database: "postgresql" });
-          const statements = Array.isArray(ast) ? ast : [ast];
-          for (let i = 0; i < statements.length; i++) {
-            const stmt = statements[i];
-            if (stmt.type === "create" && stmt.keyword === "index") {
-              const indexName = stmt.index || "unnamed_index";
-              const analysis = await analyzeIndexEffectiveness(stmt, migration);
-              if (analysis.shouldIndex) {
-                const isConcurrent = migration.up.toLowerCase().includes("concurrently");
-                if (!isConcurrent) {
-                  issues.push({
-                    line: i + 1,
-                    description: `Index "${indexName}" creation will block table access during creation`,
-                    recommendation: analysis.recommendation,
-                    severity: analysis.priority === "high" ? "critical" : "medium",
-                    location: `CREATE INDEX ${indexName}`
-                  });
-                }
-              } else {
-                issues.push({
-                  line: i + 1,
-                  description: `Index "${indexName}" may not be beneficial: ${analysis.reason}`,
-                  recommendation: `Consider removing this index or reviewing if it's truly needed`,
-                  severity: "low",
-                  location: `CREATE INDEX ${indexName}`
-                });
-              }
-            }
-          }
-        } catch (error) {
-          const lines = migration.up.split("\n");
-          lines.forEach((line, index) => {
-            if (/create\s+index/i.test(line) && !/concurrently/i.test(line)) {
-              const indexMatch = line.match(/create\s+index\s+(\w+)/i);
-              const indexName = indexMatch?.[1] || "unknown";
-              issues.push({
-                line: index + 1,
-                description: `Index "${indexName}" creation will block table access during creation`,
-                recommendation: "Use CONCURRENT option to allow non-blocking index creation",
-                severity: "medium",
-                location: `CREATE INDEX ${indexName}`
-              });
-            }
-          });
-        }
-        return {
-          applicable: issues.length > 0,
-          confidence: issues.length > 0 ? 0.8 : 0,
-          issues,
-          impact: {
-            riskReduction: 0.3,
-            performanceImprovement: 0.7,
-            complexityAdded: 0.1,
-            description: "Analyzes CREATE INDEX operations for blocking behavior and effectiveness"
-          }
-        };
-      }
-    };
-    concurrentIndexApplicator = {
-      async apply(content, migration) {
-        const parser = new Parser();
-        let modifiedContent = content;
-        const changes = [];
-        try {
-          const ast = parser.astify(content, { database: "postgresql" });
-          const statements = Array.isArray(ast) ? ast : [ast];
-          let hasChanges = false;
-          for (const stmt of statements) {
-            if (stmt.type === "create" && stmt.keyword === "index") {
-              const analysis = await analyzeIndexEffectiveness(stmt, migration);
-              if (analysis.shouldIndex && !content.toLowerCase().includes("concurrently")) {
-                const originalLine = modifiedContent.match(/CREATE\s+INDEX\s+[^\n]*/gi)?.[0] || "";
-                modifiedContent = modifiedContent.replace(
-                  /CREATE\s+INDEX\s+/gi,
-                  "CREATE INDEX CONCURRENTLY "
-                );
-                hasChanges = true;
-                changes.push({
-                  type: "MODIFIED",
-                  original: originalLine,
-                  modified: originalLine.replace(/CREATE\s+INDEX\s+/gi, "CREATE INDEX CONCURRENTLY "),
-                  line: 1,
-                  reason: "Made index creation concurrent for better performance"
-                });
-              }
-            }
-          }
-          return {
-            enhancement: enhancement13,
-            applied: hasChanges,
-            modifiedContent,
-            changes,
-            warnings: []
-          };
-        } catch (error) {
-          const originalContent = modifiedContent;
-          const lines = modifiedContent.split("\n");
-          const modifiedLines = [];
-          lines.forEach((line, index) => {
-            if (/CREATE\s+INDEX\s+/gi.test(line) && !/CONCURRENTLY/i.test(line)) {
-              const modifiedLine = line.replace(/CREATE\s+INDEX\s+/gi, "CREATE INDEX CONCURRENTLY ");
-              modifiedLines.push(modifiedLine);
-              changes.push({
-                type: "MODIFIED",
-                original: line,
-                modified: modifiedLine,
-                line: index + 1,
-                reason: "Added CONCURRENTLY to index creation"
-              });
-            } else {
-              modifiedLines.push(line);
-            }
-          });
-          const hasChanges = changes.length > 0;
-          return {
-            enhancement: enhancement13,
-            applied: hasChanges,
-            modifiedContent: hasChanges ? modifiedLines.join("\n") : originalContent,
-            changes,
-            warnings: []
-          };
-        }
-      }
-    };
-    concurrentIndexModule = {
-      enhancement: enhancement13,
-      detector: concurrentIndexDetector,
-      applicator: concurrentIndexApplicator
-    };
-  }
-});
-
 // src/enhancements/speed/remaining-stubs.ts
-var StubDetector2, StubApplicator2, batchInsertEnhancement, batchInsertModule, partialIndexEnhancement, partialIndexModule, indexOptimizationEnhancement, indexOptimizationModule, concurrentIndexModule2, queryOptimizationEnhancement, queryOptimizationModule, bulkUpdateEnhancement, bulkUpdateModule, connectionPoolingEnhancement, connectionPoolingModule, vacuumAnalyzeEnhancement, vacuumAnalyzeModule, parallelExecutionEnhancement, parallelExecutionModule, compressionEnhancement, compressionModule, statisticsUpdateEnhancement, statisticsUpdateModule, cacheOptimizationEnhancement, cacheOptimizationModule;
+var StubDetector2, StubApplicator2, batchInsertEnhancement, batchInsertModule, partialIndexEnhancement, partialIndexModule, indexOptimizationEnhancement, indexOptimizationModule, concurrentIndexEnhancement, concurrentIndexModule, queryOptimizationEnhancement, queryOptimizationModule, bulkUpdateEnhancement, bulkUpdateModule, connectionPoolingEnhancement, connectionPoolingModule, vacuumAnalyzeEnhancement, vacuumAnalyzeModule, parallelExecutionEnhancement, parallelExecutionModule, compressionEnhancement, compressionModule, statisticsUpdateEnhancement, statisticsUpdateModule, cacheOptimizationEnhancement, cacheOptimizationModule;
 var init_remaining_stubs = __esm({
   "src/enhancements/speed/remaining-stubs.ts"() {
     "use strict";
-    init_concurrent_index();
     StubDetector2 = class {
       async detect() {
         return false;
@@ -1609,11 +1370,12 @@ var init_remaining_stubs = __esm({
     };
     batchInsertEnhancement = { id: "speed-batch-insert", name: "Batch Insert", description: "Stub", category: "speed", priority: 5, requiresConfirmation: false, tags: ["stub"] };
     batchInsertModule = { enhancement: batchInsertEnhancement, detector: new StubDetector2(), applicator: new StubApplicator2() };
-    partialIndexEnhancement = { id: "speed-partial-index", name: "Partial Index", description: "Stub", category: "speed", priority: 5, requiresConfirmation: false, tags: ["stub"] };
+    partialIndexEnhancement = { id: "speed-partial-index", name: "Partial Index", description: "DISABLED - No indexing enhancements requested", category: "speed", priority: 0, requiresConfirmation: false, tags: ["disabled"] };
     partialIndexModule = { enhancement: partialIndexEnhancement, detector: new StubDetector2(), applicator: new StubApplicator2() };
-    indexOptimizationEnhancement = { id: "speed-index-optimization", name: "Index Optimization", description: "Stub", category: "speed", priority: 5, requiresConfirmation: false, tags: ["stub"] };
+    indexOptimizationEnhancement = { id: "speed-index-optimization", name: "Index Optimization", description: "DISABLED - No indexing enhancements requested", category: "speed", priority: 0, requiresConfirmation: false, tags: ["disabled"] };
     indexOptimizationModule = { enhancement: indexOptimizationEnhancement, detector: new StubDetector2(), applicator: new StubApplicator2() };
-    concurrentIndexModule2 = concurrentIndexModule;
+    concurrentIndexEnhancement = { id: "speed-concurrent-index", name: "Concurrent Index Creation", description: "DISABLED - No indexing enhancements requested", category: "speed", priority: 0, requiresConfirmation: false, tags: ["disabled"] };
+    concurrentIndexModule = { enhancement: concurrentIndexEnhancement, detector: new StubDetector2(), applicator: new StubApplicator2() };
     queryOptimizationEnhancement = { id: "speed-query-optimization", name: "Query Optimization", description: "Stub", category: "speed", priority: 5, requiresConfirmation: false, tags: ["stub"] };
     queryOptimizationModule = { enhancement: queryOptimizationEnhancement, detector: new StubDetector2(), applicator: new StubApplicator2() };
     bulkUpdateEnhancement = { id: "speed-bulk-update", name: "Bulk Update", description: "Stub", category: "speed", priority: 5, requiresConfirmation: false, tags: ["stub"] };
@@ -1637,9 +1399,12 @@ var init_remaining_stubs = __esm({
 async function loadSpeedEnhancements() {
   return [
     batchInsertModule,
-    concurrentIndexModule2,
+    concurrentIndexModule,
+    // DISABLED: User requested no indexing in speed enhancements  
     partialIndexModule,
+    // DISABLED: User requested no indexing in speed enhancements
     indexOptimizationModule,
+    // DISABLED: User requested no indexing in speed enhancements
     queryOptimizationModule,
     bulkUpdateModule,
     connectionPoolingModule,
@@ -1793,10 +1558,10 @@ var init_enhancement_engine = __esm({
         let modifiedContent = content;
         const results = [];
         const sortedEnhancements = [...enhancements].sort((a, b) => b.priority - a.priority);
-        for (const enhancement14 of sortedEnhancements) {
-          const module = this.moduleCache.get(enhancement14.id);
+        for (const enhancement13 of sortedEnhancements) {
+          const module = this.moduleCache.get(enhancement13.id);
           if (!module) {
-            console.warn(`Enhancement module not found: ${enhancement14.id}`);
+            console.warn(`Enhancement module not found: ${enhancement13.id}`);
             continue;
           }
           try {
@@ -1807,7 +1572,7 @@ var init_enhancement_engine = __esm({
               results.push(result);
             }
           } catch (error) {
-            console.warn(`Error applying enhancement ${enhancement14.id}:`, error);
+            console.warn(`Error applying enhancement ${enhancement13.id}:`, error);
           }
         }
         return modifiedContent;
@@ -1819,11 +1584,11 @@ var init_enhancement_engine = __esm({
        * @param enhancement Enhancement to apply
        * @returns Enhancement result
        */
-      async applySingleEnhancement(content, migration, enhancement14) {
+      async applySingleEnhancement(content, migration, enhancement13) {
         await this.initialize();
-        const module = this.moduleCache.get(enhancement14.id);
+        const module = this.moduleCache.get(enhancement13.id);
         if (!module) {
-          throw new Error(`Enhancement module not found: ${enhancement14.id}`);
+          throw new Error(`Enhancement module not found: ${enhancement13.id}`);
         }
         return await module.applicator.apply(content, migration);
       }
@@ -1911,6 +1676,36 @@ var init_enhancement_engine = __esm({
         ];
       }
       /**
+       * Generate rollback script for a migration
+       * @param migration Migration file object
+       * @returns Rollback SQL script
+       */
+      async generateRollback(migration) {
+        const sql = migration.up;
+        const sqlLower = sql.toLowerCase();
+        if (sqlLower.includes("alter table") && sqlLower.includes("add column")) {
+          const tableMatch = sql.match(/alter\s+table\s+(\w+)/i);
+          const columnMatch = sql.match(/add\s+column\s+(\w+)/i);
+          if (tableMatch && columnMatch) {
+            return `ALTER TABLE ${tableMatch[1]} DROP COLUMN ${columnMatch[1]};`;
+          }
+        }
+        if (sqlLower.includes("create index")) {
+          const indexMatch = sql.match(/create\s+index\s+(?:concurrently\s+)?(\w+)/i);
+          if (indexMatch) {
+            return `DROP INDEX ${indexMatch[1]};`;
+          }
+        }
+        if (sqlLower.includes("alter table") && sqlLower.includes("add constraint")) {
+          const tableMatch = sql.match(/alter\s+table\s+(\w+)/i);
+          const constraintMatch = sql.match(/add\s+constraint\s+(\w+)/i);
+          if (tableMatch && constraintMatch) {
+            return `ALTER TABLE ${tableMatch[1]} DROP CONSTRAINT ${constraintMatch[1]};`;
+          }
+        }
+        return "-- Manual rollback required\n-- Please create appropriate rollback statements for this migration";
+      }
+      /**
        * Get engine statistics including performance metrics
        * @returns Statistics about the enhancement engine
        */
@@ -1918,8 +1713,8 @@ var init_enhancement_engine = __esm({
         await this.initialize();
         const allEnhancements = await this.getAllEnhancements();
         const enhancementsByPriority = {};
-        allEnhancements.forEach((enhancement14) => {
-          enhancementsByPriority[enhancement14.priority] = (enhancementsByPriority[enhancement14.priority] || 0) + 1;
+        allEnhancements.forEach((enhancement13) => {
+          enhancementsByPriority[enhancement13.priority] = (enhancementsByPriority[enhancement13.priority] || 0) + 1;
         });
         return {
           totalEnhancements: allEnhancements.length,
@@ -1937,7 +1732,7 @@ var init_enhancement_engine = __esm({
 import fs from "fs-extra";
 import path from "path";
 import crypto from "crypto";
-import pkg2 from "node-sql-parser";
+import pkg from "node-sql-parser";
 async function findLatestMigration(migrationsDir) {
   try {
     const files = await fs.readdir(migrationsDir);
@@ -1981,7 +1776,7 @@ function extractTimestampFromFilename(filename) {
 }
 async function parseSqlOperations(content) {
   const operations = [];
-  const parser = new Parser2();
+  const parser = new Parser();
   const statements = content.split(/(--> statement-breakpoint|;)/i).map((stmt) => stmt.trim()).filter((stmt) => stmt && !stmt.match(/^--> statement-breakpoint$/i) && stmt !== ";");
   let lineNumber = 1;
   for (const statement of statements) {
@@ -2101,11 +1896,11 @@ async function validateMigrationPath(filePath, migrationsDir) {
   }
   return resolvedPath;
 }
-var Parser2;
+var Parser;
 var init_migration_utils = __esm({
   "src/core/migration-utils.ts"() {
     "use strict";
-    ({ Parser: Parser2 } = pkg2);
+    ({ Parser } = pkg);
   }
 });
 
@@ -2168,17 +1963,17 @@ async function enhanceCommand(options, globalOptions) {
       const safetyEnhancements = await engine.detectSafetyEnhancements(migration);
       if (safetyEnhancements.length > 0) {
         safetySpinner.succeed(`Found ${safetyEnhancements.length} safety issue(s)`);
-        for (const enhancement14 of safetyEnhancements) {
-          const analysis = await engine.getEnhancementAnalysis(enhancement14.id, migration);
+        for (const enhancement13 of safetyEnhancements) {
+          const analysis = await engine.getEnhancementAnalysis(enhancement13.id, migration);
           if (analysis && analysis.issues.length > 0) {
-            displayWarning(`${enhancement14.name}`, [enhancement14.description]);
+            displayWarning(`${enhancement13.name}`, [enhancement13.description]);
             for (const issue of analysis.issues) {
               log2.info(`    ${pc.red("\u26A0")} ${issue.description} ${pc.gray(`(line ${issue.line})`)}`);
               log2.info(`    ${pc.gray("\u2192 " + issue.recommendation)}`);
             }
             log2.info("");
           } else {
-            displayInfo(`${enhancement14.name}`, [enhancement14.description]);
+            displayInfo(`${enhancement13.name}`, [enhancement13.description]);
           }
         }
         const applySafety = await confirm2({
@@ -2216,17 +2011,17 @@ async function enhanceCommand(options, globalOptions) {
       const speedEnhancements = await engine.detectSpeedEnhancements(migration);
       if (speedEnhancements.length > 0) {
         speedSpinner.succeed(`Found ${speedEnhancements.length} optimization opportunity(ies)`);
-        for (const enhancement14 of speedEnhancements) {
-          const analysis = await engine.getEnhancementAnalysis(enhancement14.id, migration);
+        for (const enhancement13 of speedEnhancements) {
+          const analysis = await engine.getEnhancementAnalysis(enhancement13.id, migration);
           if (analysis && analysis.issues.length > 0) {
-            displayInfo(`${enhancement14.name}`, [enhancement14.description]);
+            displayInfo(`${enhancement13.name}`, [enhancement13.description]);
             for (const issue of analysis.issues) {
               log2.info(`    ${pc.yellow("\u26A1")} ${issue.description} ${pc.gray(`(line ${issue.line})`)}`);
               log2.info(`    ${pc.gray("\u2192 " + issue.recommendation)}`);
             }
             log2.info("");
           } else {
-            displayInfo(`${enhancement14.name}`, [enhancement14.description]);
+            displayInfo(`${enhancement13.name}`, [enhancement13.description]);
           }
         }
         const applySpeed = await confirm2({
@@ -2370,7 +2165,7 @@ async function planCommand(options, globalOptions) {
   const content = await fs4.readFile(filePath, "utf-8");
   const engine = new EnhancementEngine();
   intro2("\u{1F4DD} Planning Enhancement");
-  const safetyEnhancements = await engine.detectSafetyEnhancements({
+  const migration = {
     path: filePath,
     name: migrationFile,
     up: content,
@@ -2378,19 +2173,12 @@ async function planCommand(options, globalOptions) {
     timestamp: /* @__PURE__ */ new Date(),
     operations: [],
     checksum: ""
-  });
-  const speedEnhancements = await engine.detectSpeedEnhancements({
-    path: filePath,
-    name: migrationFile,
-    up: content,
-    down: "",
-    timestamp: /* @__PURE__ */ new Date(),
-    operations: [],
-    checksum: ""
-  });
+  };
+  const safetyEnhancements = await engine.detectSafetyEnhancements(migration);
+  const speedEnhancements = await engine.detectSpeedEnhancements(migration);
   const allEnhancements = [...safetyEnhancements, ...speedEnhancements];
   if (allEnhancements.length > 0) {
-    const newContent = await engine.applyEnhancements(content, allEnhancements);
+    const newContent = await engine.applyEnhancements(content, migration, allEnhancements);
     const diff = diffChars(content, newContent);
     console.log(pc3.bold(`
 Changes for ${migrationFile}:
@@ -3452,11 +3240,11 @@ async function initCommand(options, globalOptions) {
     if (await fsExtra2.pathExists(pkgPath)) {
       const fsmod = await import("fs-extra");
       const fsDyn = fsmod.default ?? fsmod;
-      const pkg3 = await fsDyn.readJson(pkgPath);
-      pkg3.scripts = pkg3.scripts || {};
-      if (!pkg3.scripts.flow) {
-        pkg3.scripts.flow = "flow";
-        await fsDyn.writeJson(pkgPath, pkg3, { spaces: 2 });
+      const pkg2 = await fsDyn.readJson(pkgPath);
+      pkg2.scripts = pkg2.scripts || {};
+      if (!pkg2.scripts.flow) {
+        pkg2.scripts.flow = "flow";
+        await fsDyn.writeJson(pkgPath, pkg2, { spaces: 2 });
         spinner2.update('Added "flow" script to package.json');
       }
     }

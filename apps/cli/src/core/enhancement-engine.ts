@@ -322,6 +322,41 @@ export class EnhancementEngine {
   }
 
   /**
+   * Generate rollback script for a migration
+   * @param migration Migration file object
+   * @returns Rollback SQL script
+   */
+  async generateRollback(migration: MigrationFile): Promise<string> {
+    const sql = migration.up;
+    const sqlLower = sql.toLowerCase();
+    
+    if (sqlLower.includes('alter table') && sqlLower.includes('add column')) {
+      const tableMatch = sql.match(/alter\s+table\s+(\w+)/i);
+      const columnMatch = sql.match(/add\s+column\s+(\w+)/i);
+      if (tableMatch && columnMatch) {
+        return `ALTER TABLE ${tableMatch[1]} DROP COLUMN ${columnMatch[1]};`;
+      }
+    }
+    
+    if (sqlLower.includes('create index')) {
+      const indexMatch = sql.match(/create\s+index\s+(?:concurrently\s+)?(\w+)/i);
+      if (indexMatch) {
+        return `DROP INDEX ${indexMatch[1]};`;
+      }
+    }
+    
+    if (sqlLower.includes('alter table') && sqlLower.includes('add constraint')) {
+      const tableMatch = sql.match(/alter\s+table\s+(\w+)/i);
+      const constraintMatch = sql.match(/add\s+constraint\s+(\w+)/i);
+      if (tableMatch && constraintMatch) {
+        return `ALTER TABLE ${tableMatch[1]} DROP CONSTRAINT ${constraintMatch[1]};`;
+      }
+    }
+    
+    return '-- Manual rollback required\n-- Please create appropriate rollback statements for this migration';
+  }
+
+  /**
    * Get engine statistics including performance metrics
    * @returns Statistics about the enhancement engine
    */

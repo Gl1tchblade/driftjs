@@ -327,8 +327,8 @@ export class MigrationParser {
     // Common migration file patterns
     return (ext === '.sql' || ext === '.ts') && (
       fileName.includes('migration') ||
-      fileName.match(/^\d{4}-\d{2}-\d{2}/) || // Date format
-      fileName.match(/^\d{10,}/) || // Timestamp format
+      /^\d{4}-\d{2}-\d{2}/.test(fileName) || // Date format
+      /^\d{10,}/.test(fileName) || // Timestamp format
       fileName.includes('schema') ||
       fileName === 'migration.sql'
     );

@@ -366,7 +366,7 @@ COMMIT;`}</code></pre>
               <span className="ml-8 text-blue-400">run:</span> flow validate --all --strict<br/>
               <span className="ml-6">- <span className="text-blue-400">name:</span> Plan Enhancements</span><br/>
               <span className="ml-8 text-blue-400">run:</span> flow plan --output enhancement-plan.json<br/>
-              <span className="ml-6">- <span className="text-blue-4">- <span className="text-blue-400">name:</span> Apply Enhancements</span><br/>
+              <span className="ml-6">- <span className="text-blue-400">name:</span> Apply Enhancements</span><br/>
               <span className="ml-8 text-blue-400">run:</span> flow enhance --force<br/>
               <span className="ml-6">- <span className="text-blue-400">name:</span> Generate Report</span><br/>
               <span className="ml-8 text-blue-400">run:</span> flow status --export migration-report.json

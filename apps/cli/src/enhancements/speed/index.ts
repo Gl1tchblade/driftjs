@@ -5,12 +5,12 @@
 
 import { EnhancementModule } from '../../core/types.js';
 
-// Import all speed enhancement modules
+// Import all speed enhancement modules  
 import { 
   batchInsertModule,
-  concurrentIndexModule,
-  partialIndexModule,
-  indexOptimizationModule,
+  concurrentIndexModule, // DISABLED: User requested no indexing in speed enhancements
+  partialIndexModule, // DISABLED: User requested no indexing in speed enhancements
+  indexOptimizationModule, // DISABLED: User requested no indexing in speed enhancements
   queryOptimizationModule,
   bulkUpdateModule,
   connectionPoolingModule,
@@ -28,9 +28,9 @@ import {
 export async function loadSpeedEnhancements(): Promise<EnhancementModule[]> {
   return [
     batchInsertModule,
-    concurrentIndexModule,
-    partialIndexModule,
-    indexOptimizationModule,
+    concurrentIndexModule, // DISABLED: User requested no indexing in speed enhancements  
+    partialIndexModule, // DISABLED: User requested no indexing in speed enhancements
+    indexOptimizationModule, // DISABLED: User requested no indexing in speed enhancements
     queryOptimizationModule,
     bulkUpdateModule,
     connectionPoolingModule,

@@ -539,10 +539,12 @@ export class SQLRiskDetector {
     categories: RiskCategory[]
     mitigations: string[]
     blockers: string[]
+    warnings: string[]
   }> {
     const categories: RiskCategory[] = []
     const mitigations: string[] = []
     const blockers: string[] = []
+    const warnings: string[] = []
     
     // Operations that require application downtime
     if (statementLower.includes('rename table') || statementLower.includes('alter table') && statementLower.includes('rename to')) {
@@ -580,7 +582,7 @@ export class SQLRiskDetector {
       warnings.push('Data conversion may fail if values are incompatible')
     }
     
-    return { categories, mitigations, blockers }
+    return { categories, mitigations, blockers, warnings }
   }
   
   /**

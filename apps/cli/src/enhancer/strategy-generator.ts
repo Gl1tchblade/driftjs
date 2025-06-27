@@ -272,9 +272,9 @@ export class EnhancementStrategyGenerator {
           checkName: 'table_exists',
           description: 'Verify table exists before alteration',
           query: `SELECT 1 FROM information_schema.tables WHERE table_name = '${tableMatch[1]}';`,
-          expectedResult: 'has_rows',
-          onFailure: 'ABORT'
-        } as PreFlightCheck)
+          expectedResult: 'NOT_EMPTY',
+          failureAction: 'BLOCK'
+        })
       }
     }
     
@@ -291,9 +291,9 @@ export class EnhancementStrategyGenerator {
           stepName: 'verify_table_created',
           description: 'Verify table was created successfully',
           query: `SELECT 1 FROM information_schema.tables WHERE table_name = '${tableMatch[1]}';`,
-          expectedResult: 'has_rows',
-          onFailure: 'WARN'
-        } as ValidationStep)
+          expectedCondition: 'COUNT > 0',
+          isRequired: true
+        })
       }
     }
     

@@ -46,7 +46,7 @@ export async function planCommand(options: PlanOptions, globalOptions: GlobalOpt
 
   intro('📝 Planning Enhancement');
 
-  const safetyEnhancements = await engine.detectSafetyEnhancements({
+  const migration = {
     path: filePath,
     name: migrationFile,
     up: content,
@@ -54,22 +54,15 @@ export async function planCommand(options: PlanOptions, globalOptions: GlobalOpt
     timestamp: new Date(),
     operations: [],
     checksum: '',
-  });
+  };
 
-  const speedEnhancements = await engine.detectSpeedEnhancements({
-    path: filePath,
-    name: migrationFile,
-    up: content,
-    down: '',
-    timestamp: new Date(),
-    operations: [],
-    checksum: '',
-  });
+  const safetyEnhancements = await engine.detectSafetyEnhancements(migration);
+  const speedEnhancements = await engine.detectSpeedEnhancements(migration);
 
   const allEnhancements = [...safetyEnhancements, ...speedEnhancements];
 
   if (allEnhancements.length > 0) {
-    const newContent = await engine.applyEnhancements(content, allEnhancements);
+    const newContent = await engine.applyEnhancements(content, migration, allEnhancements);
     const diff = diffChars(content, newContent);
 
     console.log(pc.bold(`

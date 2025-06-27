@@ -190,7 +190,7 @@ function FlowEnhanceDoc() {
             <ul className="space-y-2 text-sm">
               <li className="flex items-center">
                 <span className="w-2 h-2 bg-red-500 rounded-full mr-3"></span>
-                Complex composite indexes (>3 columns)
+                Complex composite indexes (&gt;3 columns)
               </li>
               <li className="flex items-center">
                 <span className="w-2 h-2 bg-red-500 rounded-full mr-3"></span>
