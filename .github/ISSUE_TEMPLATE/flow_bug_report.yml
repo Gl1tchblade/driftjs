@@ -1,155 +1,29 @@
 name: "🐛 Flow Bug Report"
-description: "Report a problem with the Flow database migration enhancement tool."
+description: "Quickly report a Flow bug (minimal form)"
 labels: ["bug", "flow"]
-title: "[Bug]: <brief description>"
-assignees: []
+title: "[Bug]: <short description>"
 
 body:
-  - type: markdown
-    attributes:
-      value: |
-        ## Thanks for helping improve Flow!
-        Please fill out **all required** sections below. Issues with insufficient information may be closed.
-
-  - type: input
-    id: flow_version
-    attributes:
-      label: "Flow Version"
-      description: "Run `bun flow --version` to get the version."
-      placeholder: "e.g. 0.3.2"
-    validations:
-      required: true
-
-  - type: input
-    id: bun_version
-    attributes:
-      label: "Bun Version"
-      description: "Run `bun --version` to get the version."
-      placeholder: "e.g. 1.2.17"
-    validations:
-      required: true
-
-  - type: input
-    id: node_version
-    attributes:
-      label: "Node.js Version"
-      description: "Flow internally relies on Node APIs through Bun — include the Node compatibility version shown in `bun --version`."
-      placeholder: "e.g. 18.19.0"
-    validations:
-      required: true
-
-  - type: dropdown
-    id: db_system
-    attributes:
-      label: "Database System"
-      options:
-        - PostgreSQL
-        - MySQL
-        - SQLite
-        - SQL Server
-        - Other
-      multiple: false
-    validations:
-      required: true
-
-  - type: input
-    id: db_version
-    attributes:
-      label: "Database Version"
-      placeholder: "e.g. PostgreSQL 15.4"
-    validations:
-      required: false
-
-  - type: input
-    id: os
-    attributes:
-      label: "Operating System"
-      placeholder: "e.g. macOS 14.4, Ubuntu 22.04, Windows 11 + WSL2"
-    validations:
-      required: true
-
   - type: textarea
-    id: flow_config
+    id: details
     attributes:
-      label: "Flow Configuration (optional)"
-      description: "Paste relevant parts of your `flow.config.json` (omit any sensitive credentials)."
-      render: json
+      label: "Bug Details"
+      description: "Describe what went wrong, the expected behavior, and any relevant environment details (Flow & Bun version, DB, OS, etc.)."
       placeholder: |
-        {
-          "defaultEnvironment": "development",
-          "environments": {
-            "development": {
-              "databaseUrl": "postgres://user:****@localhost:5432/db",
-              "migrationsPath": "./migrations"
-            }
-          },
-          ...
-        }
+        After running `bun flow enhance` I received ...
+        Expected: ...
+        Actual: ...
+        Env: Flow 0.3.2, Bun 1.2.17, PostgreSQL 15 on Ubuntu 22.04
     validations:
-      required: false
-
-  - type: textarea
-    id: migration_snippet
-    attributes:
-      label: "Migration SQL (optional)"
-      description: "Provide the minimal migration SQL that reproduces the issue. Wrap with ```sql```."
-      render: sql
-    validations:
-      required: false
+      required: true
 
   - type: textarea
     id: steps
     attributes:
-      label: "Steps to Reproduce"
-      description: "List precise steps so we can reproduce the issue."
+      label: "Steps to Reproduce (optional)"
+      description: "If applicable, list the minimal steps or SQL migration needed to reproduce the issue."
       placeholder: |
-        1. Generate a migration: `drizzle-kit generate`
-        2. Enhance migration: `bun flow enhance`
-        3. Observe error XYZ
+        1. Generate a migration ...
+        2. Run `bun flow enhance` ...
     validations:
-      required: true
-
-  - type: textarea
-    id: expected
-    attributes:
-      label: "Expected Behavior"
-      description: "What did you expect to happen?"
-    validations:
-      required: true
-
-  - type: textarea
-    id: actual
-    attributes:
-      label: "Actual Behavior / Error Output"
-      description: "What actually happened? Include full CLI output and stack traces if available."
-      render: text
-    validations:
-      required: true
-
-  - type: textarea
-    id: additional
-    attributes:
-      label: "Additional Context"
-      description: "Anything else? Logs, screenshots, temporary work-arounds, etc."
-    validations:
-      required: false
-
-  - type: dropdown
-    id: severity
-    attributes:
-      label: "Severity"
-      options:
-        - Critical (blocks production usage)
-        - High (blocks development)
-        - Medium (workaround exists)
-        - Low (cosmetic)
-    validations:
-      required: true
-
-  - type: checkboxes
-    id: willingness
-    attributes:
-      label: "Are you willing to submit a PR to fix this issue?"
-      options:
-        - label: "Yes, I am willing to submit a PR."
-          required: false 
+      required: false 
