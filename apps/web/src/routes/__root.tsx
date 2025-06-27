@@ -24,12 +24,12 @@ export const Route = createRootRouteWithContext<RouterAppContext>()({
 	notFoundComponent: NotFound,
 	head: function () {
 		const pathname = useRouterState({ select: (s) => s.resolvedLocation.pathname });
-		const canonicalUrl = `https://example.com${pathname}`;
+		const canonicalUrl = `https://driftjs.com${pathname}`;
 		const siteDescription = "DriftJS builds tools developers love. From production-safe database migrations to intelligent workflow automation, we help you ship with confidence.";
 		const siteName = "DriftJS"; // Placeholder
-		const siteUrl = "https://example.com"; // Placeholder
-		const ogImageUrl = `${siteUrl}/og-image.jpg`; // Placeholder
-		const twitterImageUrl = `${siteUrl}/twitter-image.jpg`; // Placeholder
+		const siteUrl = "https://driftjs.com"; // Placeholder
+		const ogImageUrl = `${siteUrl}/flow-banner.png`; // Placeholder
+		const twitterImageUrl = `${siteUrl}/flow-banner.png`; // Placeholder
 
 		const webSiteJsonLd = {
 			"@context": "https://schema.org",
@@ -93,10 +93,6 @@ export const Route = createRootRouteWithContext<RouterAppContext>()({
 			],
 			links: [
 				{
-					rel: "icon",
-					href: "/favicon.ico",
-				},
-				{
 					rel: "canonical",
 					href: canonicalUrl,
 				},
@@ -109,23 +105,6 @@ export const Route = createRootRouteWithContext<RouterAppContext>()({
 			],
 		};
 	},
-});
-
-function RootComponent() {
-	const isFetching = useRouterState({
-			},
-			{
-				name: "description",
-				content: "DriftJS builds tools developers love. From production-safe database migrations to intelligent workflow automation, we help you ship with confidence.",
-			},
-		],
-		links: [
-			{
-				rel: "icon",
-				href: "/favicon.ico",
-			},
-		],
-	}),
 });
 
 function RootComponent() {
