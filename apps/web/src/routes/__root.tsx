@@ -22,10 +22,97 @@ export interface RouterAppContext {
 export const Route = createRootRouteWithContext<RouterAppContext>()({
 	component: RootComponent,
 	notFoundComponent: NotFound,
-	head: () => ({
-		meta: [
-			{
-				title: "DriftJS",
+	head: function () {
+		const pathname = useRouterState({ select: (s) => s.resolvedLocation.pathname });
+		const canonicalUrl = `https://example.com${pathname}`;
+		const siteDescription = "DriftJS builds tools developers love. From production-safe database migrations to intelligent workflow automation, we help you ship with confidence.";
+		const siteName = "DriftJS"; // Placeholder
+		const siteUrl = "https://example.com"; // Placeholder
+		const ogImageUrl = `${siteUrl}/og-image.jpg`; // Placeholder
+		const twitterImageUrl = `${siteUrl}/twitter-image.jpg`; // Placeholder
+
+		const webSiteJsonLd = {
+			"@context": "https://schema.org",
+			"@type": "WebSite",
+			name: siteName,
+			url: siteUrl,
+			description: siteDescription,
+		};
+
+		return {
+			meta: [
+				{
+					title: siteName, // Use siteName for consistency
+				},
+				{
+					name: "description",
+					content: siteDescription,
+				},
+				// Open Graph Tags
+				{
+					property: "og:type",
+					content: "website",
+				},
+				{
+					property: "og:title",
+					content: siteName,
+				},
+				{
+					property: "og:description",
+					content: siteDescription,
+				},
+				{
+					property: "og:url",
+					content: canonicalUrl,
+				},
+				{
+					property: "og:image",
+					content: ogImageUrl,
+				},
+				// Twitter Card Tags
+				{
+					name: "twitter:card",
+					content: "summary_large_image",
+				},
+				{
+					name: "twitter:title",
+					content: siteName,
+				},
+				{
+					name: "twitter:description",
+					content: siteDescription,
+				},
+				{
+					name: "twitter:url",
+					content: canonicalUrl,
+				},
+				{
+					name: "twitter:image",
+					content: twitterImageUrl,
+				},
+			],
+			links: [
+				{
+					rel: "icon",
+					href: "/favicon.ico",
+				},
+				{
+					rel: "canonical",
+					href: canonicalUrl,
+				},
+			],
+			scripts: [
+				{
+					type: "application/ld+json",
+					children: JSON.stringify(webSiteJsonLd),
+				},
+			],
+		};
+	},
+});
+
+function RootComponent() {
+	const isFetching = useRouterState({
 			},
 			{
 				name: "description",
