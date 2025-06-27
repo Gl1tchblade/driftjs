@@ -15,15 +15,6 @@ const FLOW_BANNER_SRC = new URL("../assets/flow-banner.jpg", import.meta.url).hr
 function FlowProductPage() {
 	return (
 		<PageLayout>
-			{/* Banner */}
-			<section className="w-full">
-				<img
-					src={FLOW_BANNER_SRC}
-					alt="Flow CLI banner"
-					className="mx-auto h-auto w-full max-h-[500px] object-cover"
-				/>
-			</section>
-
 			<section className="flex min-h-[60vh] flex-col items-center justify-center px-4 text-center">
 				<h1 className="mb-6 text-5xl font-semibold lowercase">
 					<span className="gradient-text-static lowercase">flow</span>

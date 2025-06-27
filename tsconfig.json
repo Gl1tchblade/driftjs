@@ -22,6 +22,6 @@
       "@driftjs/patterns": ["./packages/patterns/src/index.ts"]
     }
   },
-  "include": [],
+  "include": ["apps", "packages"],
   "exclude": ["node_modules", "dist", ".next", ".turbo"]
 } 
