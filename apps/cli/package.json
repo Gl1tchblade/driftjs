@@ -14,7 +14,8 @@
     "check-types": "tsc --noEmit",
     "test": "jest",
     "test:watch": "jest --watch",
-    "prepublishOnly": "bun run build && bun run check-types"
+    "prepublishOnly": "bun run build && bun run check-types",
+    "postinstall": "node -e \"console.log('Skipping optional native dependencies in production')\""
   },
   "keywords": [
     "database",

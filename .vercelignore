@@ -1,0 +1,5 @@
+apps/cli/
+packages/analyzer/
+*.md
+.git/
+.github/

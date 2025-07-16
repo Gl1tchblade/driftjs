@@ -1,0 +1,4 @@
+{
+  "buildCommand": "bun run build:web",
+  "outputDirectory": "apps/web/dist"
+}
