@@ -60,11 +60,25 @@
     "picocolors": "^1.0.1",
     "prompts": "^2.4.2"
   },
-  "optionalDependencies": {
+  "peerDependencies": {
     "better-sqlite3": "^9.4.0",
     "mysql2": "^3.10.1",
     "pg": "^8.12.0",
     "sqlite3": "^5.1.7"
+  },
+  "peerDependenciesMeta": {
+    "better-sqlite3": {
+      "optional": true
+    },
+    "mysql2": {
+      "optional": true
+    },
+    "pg": {
+      "optional": true
+    },
+    "sqlite3": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.9",
