@@ -1,5 +1,10 @@
 apps/cli/
 packages/analyzer/
+apps/test-drizzle/
 *.md
 .git/
 .github/
+node_modules/
+.turbo/
+dist/
+build/

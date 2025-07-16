@@ -21,7 +21,12 @@ export class PostgreSQLConnection implements DatabaseConnection {
   async connect(): Promise<void> {
     try {
       // Dynamic import to avoid bundling issues
-      const { Client } = await import('pg')
+      let Client
+      try {
+        ({ Client } = await import('pg'))
+      } catch (importError) {
+        throw new Error('pg is not installed. Please install it with: npm install pg')
+      }
       
       this.client = new Client({
         host: this.config.host,
@@ -101,7 +106,12 @@ export class MySQLConnection implements DatabaseConnection {
   async connect(): Promise<void> {
     try {
       // Dynamic import to avoid bundling issues
-      const mysql = await import('mysql2/promise')
+      let mysql
+      try {
+        mysql = await import('mysql2/promise')
+      } catch (importError) {
+        throw new Error('mysql2 is not installed. Please install it with: npm install mysql2')
+      }
       
              this.connection = await mysql.createConnection({
          host: this.config.host,
@@ -178,7 +188,12 @@ export class SQLiteConnection implements DatabaseConnection {
   async connect(): Promise<void> {
     try {
       // Dynamic import to avoid bundling issues
-      const Database = (await import('better-sqlite3')).default
+      let Database
+      try {
+        Database = (await import('better-sqlite3')).default
+      } catch (importError) {
+        throw new Error('better-sqlite3 is not installed. Please install it with: npm install better-sqlite3')
+      }
       
       const dbPath = this.config.database || 'database.sqlite'
              this.db = new Database(dbPath, {
