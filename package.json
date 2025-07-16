@@ -21,6 +21,26 @@
     "flow": "flow"
   },
   "dependencies": {},
+  "peerDependencies": {
+    "better-sqlite3": "^9.4.0",
+    "mysql2": "^3.10.1",
+    "pg": "^8.12.0",
+    "sqlite3": "^5.1.7"
+  },
+  "peerDependenciesMeta": {
+    "better-sqlite3": {
+      "optional": true
+    },
+    "mysql2": {
+      "optional": true
+    },
+    "pg": {
+      "optional": true
+    },
+    "sqlite3": {
+      "optional": true
+    }
+  },
   "devDependencies": {
     "turbo": "^2.5.4",
     "@biomejs/biome": "^2.0.0"

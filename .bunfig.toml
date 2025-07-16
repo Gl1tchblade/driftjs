@@ -1,0 +1,11 @@
+[install]
+# Exclude native database drivers that cause compilation issues
+optional = false
+exclude = ["better-sqlite3", "mysql2", "pg", "sqlite3"]
+
+[install.scopes]
+# Skip native compilation for these packages
+"better-sqlite3" = { optional = true }
+"mysql2" = { optional = true }
+"pg" = { optional = true }
+"sqlite3" = { optional = true }
