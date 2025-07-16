@@ -10,8 +10,15 @@
   },
   "dependencies": {
     "drizzle-orm": "^0.29.0",
-    "better-sqlite3": "^9.0.0",
     "@driftjs/flow": "^0.1.7"
+  },
+  "peerDependencies": {
+    "better-sqlite3": "^9.0.0"
+  },
+  "peerDependenciesMeta": {
+    "better-sqlite3": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@types/jest": "^29.5.0",
